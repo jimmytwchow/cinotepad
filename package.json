@@ -1,0 +1,18 @@
+{
+  "name": "cinotepad",
+  "version": "0.1.0",
+  "description": "CINotepad is an online input method editor(IME) that allows users to load their own CIN file or provide a URL of CIN file so that you can use your customized input method.",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "webpack --watch",
+    "build": "webpack"
+  },
+  "keywords": [],
+  "author": "jimmytwchow",
+  "license": "MIT",
+  "devDependencies": {
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  }
+}

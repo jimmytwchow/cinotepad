@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CIN Notepad</title>
+    <style>
+      body {
+        padding: 0px;
+        margin: 0px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <input id="checkbox_enable" type="checkbox" checked />
+      <label for="checkbox_enable">中文</label>
+      <label id="lbl_btn_load" for="btn_load">上傳CIN檔案</label>
+      <input id="btn_load" type="file" text="load..." />
+    </div>
+    <div id="pnl_ime" style="min-height: 3em">
+      <div>
+        <span id="lbl_im_name"></span><span id="lbl_composing_text"></span>
+      </div>
+      <div id="lbl_candidate"></div>
+    </div>
+    <textarea
+      id="ta_cinotepad"
+      style="width: 100%; min-height: 500px"
+    ></textarea>
+  </body>
+  <script src="main.js"></script>
+</html>
