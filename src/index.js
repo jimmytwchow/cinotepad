@@ -1,4 +1,5 @@
-import { CinLoader } from "./cinloader.js";
+//import { CinLoader } from "./cinloader.js";
+import CinLoader from "./cin.js";
 
 document.getElementById("btn_load").addEventListener("change", (e) => {
   if (e.target.files.length > 0) {

@@ -1,756 +1,348 @@
-import JSTextDecoderStream from "./jstextdecoderstream.js";
-import JSLineStream from "./jslinestream.js";
+function indexOfWhiteSpace(line) {
+  let spIdx, tabIdx, wspIdx;
+  spIdx = line.indexOf(" ");
+  tabIdx = line.indexOf("\t");
+  if (tabIdx == -1 || (spIdx > -1 && spIdx < tabIdx)) {
+    wspIdx = spIdx;
+  } else {
+    wspIdx = tabIdx;
+  }
+  return wspIdx;
+}
 
-/**
- * CinLoader
- */
-export const CinLoader = {
-  load: async function (cinID, readStream) {
-    let cin = {};
+function handleComment(line) {
+  let i = line.indexOf("#");
+  if (i > -1) {
+    line = line.substring(0, i).trim();
+  }
+  return line;
+}
 
-    let lineReadStream = readStream
-      .pipeThrough(new JSTextDecoderStream())
-      .pipeThrough(new JSLineStream());
-    let reader = lineReadStream.getReader();
-
-    let initDefaultSettings = function (cin) {
-      cin.selkey = "1234567890";
-      // cin.dupsel = cin.selkey.length;
-      // cin.endkey = "";
-      // space style:
-      // 1 for dayi, noseeing
-      // 2 for simplex
-      // 4 for cangjie, array (default)
-      cin.spaceStyle = 4;
-      cin.keepKeyCase = false;
-      cin.symbolKbm = false; //Not implement yet.
-      cin.phaseAutoSkipEndKey = false; // Unused: No implementation of phrase input
-      cin.flagAutoSelectByPhase = false; // Unused: No implementation of phrase input
-      cin.flagDispPartialMatch = false; //Not implement yet.
-      cin.flagDispFullMatch = false;
-      cin.flagVerticalSelection = false; //Not implement yet.
-      cin.flagPressFullAutoSend = false; //Not implement yet.
-      cin.flagUniqueAutoSend = false; //Not implement yet.
-      return cin;
-    };
-
-    let indexOfWhiteSpace = function (line) {
-      let spIdx, tabIdx, wspIdx;
-      spIdx = line.indexOf(" ");
-      tabIdx = line.indexOf("\t");
-      if (tabIdx == -1 || (spIdx > -1 && spIdx < tabIdx)) {
-        wspIdx = spIdx;
-      } else {
-        wspIdx = tabIdx;
-      }
-      return wspIdx;
-    };
-
-    let handleComment = function (line) {
-      let i = line.indexOf("#");
-      if (i > -1) {
-        line = line.substring(0, i).trim();
-      }
-      return line;
-    };
-
-    let handleKeynameSection = async function (reader, cin) {
-      let { done, value: line } = await reader.read();
-      if (done) {
+async function handleKeynameSection(reader, cin) {
+  let { done, value: line } = await reader.read();
+  if (done) {
+    return cin;
+  } else {
+    if (line.length > 0) {
+      if (line.startsWith("%keyname end")) {
         return cin;
+      } else if (line.startsWith(" # ") && line.length > 3) {
+        cin.keyname["#"] = line.substring(3);
       } else {
-        if (line.length > 0) {
-          if (line.startsWith("%keyname end")) {
-            return cin;
-          } else if (line.startsWith(" # ") && line.length > 3) {
-            cin.keyname["#"] = line.substring(3);
-          } else {
-            let whitespaceIndex = indexOfWhiteSpace(line);
-            if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
-              cin.keyname[line.substring(0, whitespaceIndex)] = line
-                .substring(whitespaceIndex + 1)
-                .trim();
-            }
-          }
+        let whitespaceIndex = indexOfWhiteSpace(line);
+        if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
+          cin.keyname[line.substring(0, whitespaceIndex)] = line
+            .substring(whitespaceIndex + 1)
+            .trim();
         }
-        return await handleKeynameSection(reader, cin);
       }
-    };
+    }
+    return await handleKeynameSection(reader, cin);
+  }
+}
 
-    let handleQuickSection = async function (reader, cin) {
-      let { done, value: line } = await reader.read();
-      if (done) {
+async function handleQuickSection(reader, cin) {
+  let { done, value: line } = await reader.read();
+  if (done) {
+    return cin;
+  } else {
+    let keycode, candidates;
+    if (line.length > 0) {
+      if (line.startsWith("%quick end")) {
         return cin;
+      } else if (line.startsWith(" # ") && line.length > 3) {
+        keycode = "#";
+        candidates = line.substring(3).trim();
+        cin.unwrittenQuickList.push({ keycode, candidates });
       } else {
-        let keycode, candidates;
-        if (line.length > 0) {
-          if (line.startsWith("%quick end")) {
-            return cin;
-          } else if (line.startsWith(" # ") && line.length > 3) {
-            keycode = "#";
-            candidates = line.substring(3).trim();
-            cin.unwrittenQuickList.push({ keycode, candidates });
-          } else {
-            let whitespaceIndex = indexOfWhiteSpace(line);
-            if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
-              keycode = line.substring(0, whitespaceIndex);
-              candidates = line.substring(whitespaceIndex + 1).trim();
-              cin.unwrittenQuickList.push({ keycode, candidates });
-              cin.maxNumOfKeys = Math.max(cin.maxNumOfKeys, keycode.length);
-            }
-          }
+        let whitespaceIndex = indexOfWhiteSpace(line);
+        if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
+          keycode = line.substring(0, whitespaceIndex);
+          candidates = line.substring(whitespaceIndex + 1).trim();
+          cin.unwrittenQuickList.push({ keycode, candidates });
+          cin.maxNumOfKeys = Math.max(cin.maxNumOfKeys, keycode.length);
         }
-        return await handleQuickSection(reader, cin);
       }
-    };
+    }
+    return await handleQuickSection(reader, cin);
+  }
+}
 
-    let handleCharDefSection = async function (reader, cin) {
-      let { done, value: line } = await reader.read();
-      if (done) {
+async function handleCharDefSection(reader, cin) {
+  let { done, value: line } = await reader.read();
+  if (done) {
+    return cin;
+  } else {
+    let keycode, candidate;
+    if (line.length > 0) {
+      if (line.startsWith("%chardef end")) {
         return cin;
+      } else if (line.startsWith(" # ") && line.length > 3) {
+        keycode = "#";
+        candidate = line.substring(3).trim();
+        cin.unwrittenCharDefList.push({ keycode, candidate });
       } else {
-        let keycode, candidate;
-        if (line.length > 0) {
-          if (line.startsWith("%chardef end")) {
-            return cin;
-          } else if (line.startsWith(" # ") && line.length > 3) {
-            keycode = "#";
-            candidate = line.substring(3).trim();
-            cin.unwrittenCharDefList.push({ keycode, candidate });
-          } else {
-            let whitespaceIndex = indexOfWhiteSpace(line);
-            if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
-              keycode = line.substring(0, whitespaceIndex);
-              candidate = line.substring(whitespaceIndex + 1).trim();
-              cin.unwrittenCharDefList.push({ keycode, candidate });
-              cin.maxNumOfKeys = Math.max(cin.maxNumOfKeys, keycode.length);
-            }
-          }
+        let whitespaceIndex = indexOfWhiteSpace(line);
+        if (whitespaceIndex > 0 && whitespaceIndex < line.length - 1) {
+          keycode = line.substring(0, whitespaceIndex);
+          candidate = line.substring(whitespaceIndex + 1).trim();
+          cin.unwrittenCharDefList.push({ keycode, candidate });
+          cin.maxNumOfKeys = Math.max(cin.maxNumOfKeys, keycode.length);
         }
-        return await handleCharDefSection(reader, cin);
       }
-    };
+    }
+    return await handleCharDefSection(reader, cin);
+  }
+}
 
-    let handleSection = async function (reader, cin) {
-      let { done, value: line } = await reader.read();
-      if (done) {
-        if (!cin.dupsel) {
-          cin.dupsel = cin.selkey.length;
-        }
-        if (!cin.keepKeyCase) {
-          const oldKeyname = cin.keyname;
-          cin.keyname = {};
-          for (let key in oldKeyname) {
-            cin.keyname[key.toLowerCase()] = oldKeyname[key];
-          }
-          for (let i in cin.unwrittenQuickList) {
-            cin.unwrittenQuickList[i].keycode =
-              cin.unwrittenQuickList[i].keycode.toLowerCase();
-          }
-          for (let i in cin.unwrittenCharDefList) {
-            cin.unwrittenCharDefList[i].keycode =
-              cin.unwrittenCharDefList[i].keycode.toLowerCase();
-          }
-        }
-        return cin;
-      } else {
-        line = handleComment(line);
-        if (line.length > 0) {
-          if (line.startsWith("%gen_inp")) {
-            // temporarily unused (means general input module)
-          } else if (line.startsWith("%ename ")) {
-            cin.ename = line.substring("%ename ".length);
-          } else if (line.startsWith("%cname ")) {
-            cin.cname = line.substring("%cname ".length);
-          } else if (line.startsWith("%prompt ")) {
-            cin.cname = line.substring("%prompt ".length);
-          } else if (line.startsWith("%selkey ")) {
-            cin.selkey = line.substring("%selkey ".length);
-          } else if (line.startsWith("%dupsel ")) {
-            cin.dupsel = line.substring("%dupsel ".length); //e.g. %dupsel 9
-          } else if (line.startsWith("%endkey ")) {
-            cin.endkey = line.substring("%endkey ".length);
-          } else if (line.startsWith("%space_style ")) {
-            cin.spaceStyle = line.substring("%space_style ".length);
-          } else if (line.startsWith("%keep_key_case")) {
-            cin.keepKeyCase = true;
-          } else if (line.startsWith("%symbol_kbm")) {
-            cin.symbolKbm = true;
-          } else if (line.startsWith("%phase_auto_skip_endkey")) {
-            cin.phaseAutoSkipEndKey = true;
-          } else if (line.startsWith("%flag_auto_select_by_phrase")) {
-            cin.flagAutoSelectByPhase = true;
-          } else if (line.startsWith("%flag_disp_partial_match")) {
-            cin.flagDispPartialMatch = true;
-          } else if (line.startsWith("%flag_disp_full_match")) {
-            cin.flagDispFullMatch = true;
-          } else if (line.startsWith("%flag_vertical_selection")) {
-            cin.flagVerticalSelection = true;
-          } else if (line.startsWith("%flag_press_full_auto_send")) {
-            cin.flagPressFullAutoSend = true;
-          } else if (line.startsWith("%flag_unique_auto_send")) {
-            cin.flagUniqueAutoSend = true;
-          } else if (line.startsWith("%keyname begin")) {
-            cin.keyname = {};
-            cin = await handleKeynameSection(reader, cin);
-          } else if (line.startsWith("%quick begin")) {
-            cin.unwrittenQuickList = [];
-            cin = await handleQuickSection(reader, cin);
-          } else if (line.startsWith("%chardef begin")) {
-            cin.unwrittenCharDefList = [];
-            cin = await handleCharDefSection(reader, cin);
-          }
-        }
-        return await handleSection(reader, cin);
+async function handleSection(reader, cin) {
+  let { done, value: line } = await reader.read();
+  if (done) {
+    if (!cin.dupsel) {
+      cin.dupsel = cin.selkey.length;
+    }
+    if (!cin.keepKeyCase) {
+      const oldKeyname = cin.keyname;
+      cin.keyname = {};
+      for (let key in oldKeyname) {
+        cin.keyname[key.toLowerCase()] = oldKeyname[key];
       }
+      for (let i in cin.unwrittenQuickList) {
+        cin.unwrittenQuickList[i].keycode =
+          cin.unwrittenQuickList[i].keycode.toLowerCase();
+      }
+      for (let i in cin.unwrittenCharDefList) {
+        cin.unwrittenCharDefList[i].keycode =
+          cin.unwrittenCharDefList[i].keycode.toLowerCase();
+      }
+    }
+    return cin;
+  } else {
+    line = handleComment(line);
+    if (line.length > 0) {
+      if (line.startsWith("%gen_inp")) {
+        // temporarily unused (means general input module)
+      } else if (line.startsWith("%ename ")) {
+        cin.ename = line.substring("%ename ".length);
+      } else if (line.startsWith("%cname ")) {
+        cin.cname = line.substring("%cname ".length);
+      } else if (line.startsWith("%prompt ")) {
+        cin.cname = line.substring("%prompt ".length);
+      } else if (line.startsWith("%selkey ")) {
+        cin.selkey = line.substring("%selkey ".length);
+      } else if (line.startsWith("%dupsel ")) {
+        cin.dupsel = line.substring("%dupsel ".length); //e.g. %dupsel 9
+      } else if (line.startsWith("%endkey ")) {
+        cin.endkey = line.substring("%endkey ".length);
+      } else if (line.startsWith("%space_style ")) {
+        cin.spaceStyle = line.substring("%space_style ".length);
+      } else if (line.startsWith("%keep_key_case")) {
+        cin.keepKeyCase = true;
+      } else if (line.startsWith("%symbol_kbm")) {
+        cin.symbolKbm = true;
+      } else if (line.startsWith("%phase_auto_skip_endkey")) {
+        cin.phaseAutoSkipEndKey = true;
+      } else if (line.startsWith("%flag_auto_select_by_phrase")) {
+        cin.flagAutoSelectByPhase = true;
+      } else if (line.startsWith("%flag_disp_partial_match")) {
+        cin.flagDispPartialMatch = true;
+      } else if (line.startsWith("%flag_disp_full_match")) {
+        cin.flagDispFullMatch = true;
+      } else if (line.startsWith("%flag_vertical_selection")) {
+        cin.flagVerticalSelection = true;
+      } else if (line.startsWith("%flag_press_full_auto_send")) {
+        cin.flagPressFullAutoSend = true;
+      } else if (line.startsWith("%flag_unique_auto_send")) {
+        cin.flagUniqueAutoSend = true;
+      } else if (line.startsWith("%keyname begin")) {
+        cin.keyname = {};
+        cin = await handleKeynameSection(reader, cin);
+      } else if (line.startsWith("%quick begin")) {
+        cin.unwrittenQuickList = [];
+        cin = await handleQuickSection(reader, cin);
+      } else if (line.startsWith("%chardef begin")) {
+        cin.unwrittenCharDefList = [];
+        cin = await handleCharDefSection(reader, cin);
+      }
+    }
+    return await handleSection(reader, cin);
+  }
+}
+
+async function writeToDB(cin, dbName) {
+  // Open database first
+  let db = await new Promise((resolve, reject) => {
+    let openReq = indexedDB.open(dbName);
+    openReq.onsuccess = function (event) {
+      resolve(event.target.result);
     };
-
-    let writeToDB = async function (cin, dbName) {
-      // Open database first
-      let db = await new Promise((resolve, reject) => {
-        let openReq = indexedDB.open(dbName);
-        openReq.onsuccess = function (event) {
-          resolve(event.target.result);
-        };
-        openReq.onupgradeneeded = function (event) {
-          // TODO only create store when it is not created.
-          // TODO may need to check version for further updates.
-          let db = event.target.result;
-          let objS = db.createObjectStore("settings", { keyPath: "name" });
-          objS = db.createObjectStore("keyname", { keyPath: "key" });
-          objS = db.createObjectStore("quick", { keyPath: "keycode" });
-          objS = db.createObjectStore("chardef", { autoIncrement: true });
-          objS.createIndex("keycode", "keycode", { unique: false });
-        };
-        openReq.onerror = function () {
-          reject(`Cannot open IndexedDB for the file ${dbName}`);
-        };
-      });
-
-      cin.db = db;
-      cin.dbName = dbName;
-
-      // trunc tables if they exist
-      await new Promise((resolve, reject) => {
-        let transaction = db.transaction(
-          ["settings", "keyname", "quick", "chardef"],
-          "readwrite"
-        );
-        transaction.objectStore("settings").clear();
-        transaction.objectStore("keyname").clear();
-        transaction.objectStore("quick").clear();
-        transaction.objectStore("chardef").clear();
-        transaction.oncomplete = (event) => {
-          resolve();
-        };
-        transaction.onerror = (event) => {
-          reject("Error when clearing old data...");
-        };
-      });
-
-      // write to db
-      // 1. write settings
-      let promiseSettings = new Promise((resolve, reject) => {
-        let transaction = db.transaction("settings", "readwrite");
-        transaction
-          .objectStore("settings")
-          .add({ name: "%ename", value: cin.ename });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%cname", value: cin.cname });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%prompt", value: cin.prompt });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%selkey", value: cin.selkey });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%dupsel", value: cin.dupsel });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%endkey", value: cin.endkey });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%space_style", value: cin.spaceStyle });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%keep_key_case", value: cin.keepKeyCase });
-        transaction
-          .objectStore("settings")
-          .add({ name: "%symbol_kbm", value: cin.symbolKbm });
-        transaction.objectStore("settings").add({
-          name: "%phase_auto_skip_endkey",
-          value: cin.phaseAutoSkipEndKey,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_auto_select_by_phrase",
-          value: cin.flagAutoSelectByPhase,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_disp_partial_match",
-          value: cin.flagDispPartialMatch,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_disp_full_match",
-          value: cin.flagDispFullMatch,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_vertical_selection",
-          value: cin.flagVerticalSelection,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_press_full_auto_send",
-          value: cin.flagPressFullAutoSend,
-        });
-        transaction.objectStore("settings").add({
-          name: "%flag_unique_auto_send",
-          value: cin.flagUniqueAutoSend,
-        });
-        transaction.oncomplete = (event) => {
-          resolve();
-        };
-        transaction.onerror = (event) => {
-          reject("Cannot handle settings...");
-        };
-      });
-
-      // 2. write keynames
-      let promiseKeyname = new Promise((resolve, reject) => {
-        if (!cin.keyname || Object.keys(cin.keyname).length == 0) {
-          resolve();
-        } else {
-          let transaction = db.transaction("keyname", "readwrite");
-          for (let key in cin.keyname) {
-            transaction.objectStore("keyname").add({
-              key,
-              keyname: cin.keyname[key],
-            });
-          }
-          transaction.oncomplete = (event) => {
-            resolve();
-          };
-          transaction.onerror = (event) => {
-            reject("Cannot handle keyname section...");
-          };
-        }
-      });
-      // 3. write quick
-      let promiseQuick = new Promise((resolve, reject) => {
-        if (!cin.unwrittenQuickList || cin.unwrittenQuickList.length == 0) {
-          resolve();
-        } else {
-          let transaction = db.transaction("quick", "readwrite");
-          for (let value of cin.unwrittenQuickList) {
-            transaction.objectStore("quick").add(value);
-          }
-          transaction.oncomplete = (event) => {
-            resolve();
-          };
-          transaction.onerror = (event) => {
-            reject("Cannot handle quick section...");
-          };
-        }
-      });
-      // 4. write chardef
-      let promiseCharDef = new Promise((resolve, reject) => {
-        if (!cin.unwrittenCharDefList || cin.unwrittenCharDefList.length == 0) {
-          resolve();
-        } else {
-          let transaction = db.transaction("chardef", "readwrite");
-          for (let value of cin.unwrittenCharDefList) {
-            transaction.objectStore("chardef").add(value);
-          }
-          transaction.oncomplete = (event) => {
-            resolve();
-          };
-          transaction.onerror = (event) => {
-            reject("Cannot handle chardef section...");
-          };
-        }
-      });
-      // 5. clear quick and chardef arrays
-      await Promise.all([
-        promiseSettings,
-        promiseKeyname,
-        promiseQuick,
-        promiseCharDef,
-      ]);
-      delete cin.unwrittenQuickList;
-      delete cin.unwrittenCharDefList;
-      return cin;
+    openReq.onupgradeneeded = function (event) {
+      // TODO only create store when it is not created.
+      // TODO may need to check version for further updates.
+      let db = event.target.result;
+      let objS = db.createObjectStore("settings", { keyPath: "name" });
+      objS = db.createObjectStore("keyname", { keyPath: "key" });
+      objS = db.createObjectStore("quick", { keyPath: "keycode" });
+      objS = db.createObjectStore("chardef", { autoIncrement: true });
+      objS.createIndex("keycode", "keycode", { unique: false });
     };
+    openReq.onerror = function () {
+      reject(`Cannot open IndexedDB for the file ${dbName}`);
+    };
+  });
 
-    // init cin
-    cin._enable = true;
-    cin.candidateList = [];
-    cin.maxNumOfKeys = 1;
-    cin = initDefaultSettings(cin);
-    // end of init cin
+  cin.db = db;
+  cin.dbName = dbName;
 
-    const dbName = `cin_${cinID}`; // TODO: use URL resource name as filename for xhr stream
+  // trunc tables if they exist
+  await new Promise((resolve, reject) => {
+    let transaction = db.transaction(
+      ["settings", "keyname", "quick", "chardef"],
+      "readwrite"
+    );
+    transaction.objectStore("settings").clear();
+    transaction.objectStore("keyname").clear();
+    transaction.objectStore("quick").clear();
+    transaction.objectStore("chardef").clear();
+    transaction.oncomplete = (event) => {
+      resolve();
+    };
+    transaction.onerror = (event) => {
+      reject("Error when clearing old data...");
+    };
+  });
 
-    return Promise.resolve(cin)
-      .then((cin) => handleSection(reader, cin))
-      .then((cin) => writeToDB(cin, dbName))
-      .then((cin) => {
-        const STATUS_INPUT = 0;
-        const STATUS_SEL = 1;
-        let status = STATUS_INPUT;
-        let keys = "";
+  // write to db
+  // 1. write settings
+  let promiseSettings = new Promise((resolve, reject) => {
+    let transaction = db.transaction("settings", "readwrite");
+    transaction
+      .objectStore("settings")
+      .add({ name: "%ename", value: cin.ename });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%cname", value: cin.cname });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%prompt", value: cin.prompt });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%selkey", value: cin.selkey });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%dupsel", value: cin.dupsel });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%endkey", value: cin.endkey });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%space_style", value: cin.spaceStyle });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%keep_key_case", value: cin.keepKeyCase });
+    transaction
+      .objectStore("settings")
+      .add({ name: "%symbol_kbm", value: cin.symbolKbm });
+    transaction.objectStore("settings").add({
+      name: "%phase_auto_skip_endkey",
+      value: cin.phaseAutoSkipEndKey,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_auto_select_by_phrase",
+      value: cin.flagAutoSelectByPhase,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_disp_partial_match",
+      value: cin.flagDispPartialMatch,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_disp_full_match",
+      value: cin.flagDispFullMatch,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_vertical_selection",
+      value: cin.flagVerticalSelection,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_press_full_auto_send",
+      value: cin.flagPressFullAutoSend,
+    });
+    transaction.objectStore("settings").add({
+      name: "%flag_unique_auto_send",
+      value: cin.flagUniqueAutoSend,
+    });
+    transaction.oncomplete = (event) => {
+      resolve();
+    };
+    transaction.onerror = (event) => {
+      reject("Cannot handle settings...");
+    };
+  });
 
-        cin.currentPage = 0;
-
-        Object.defineProperty(cin, "enable", {
-          set(v) {
-            cin._enable = v;
-            if (!cin._enable) {
-              cin.resetKeys();
-            }
-          },
-          get() {
-            return cin._enable;
-          },
+  // 2. write keynames
+  let promiseKeyname = new Promise((resolve, reject) => {
+    if (!cin.keyname || Object.keys(cin.keyname).length == 0) {
+      resolve();
+    } else {
+      let transaction = db.transaction("keyname", "readwrite");
+      for (let key in cin.keyname) {
+        transaction.objectStore("keyname").add({
+          key,
+          keyname: cin.keyname[key],
         });
+      }
+      transaction.oncomplete = (event) => {
+        resolve();
+      };
+      transaction.onerror = (event) => {
+        reject("Cannot handle keyname section...");
+      };
+    }
+  });
+  // 3. write quick
+  let promiseQuick = new Promise((resolve, reject) => {
+    if (!cin.unwrittenQuickList || cin.unwrittenQuickList.length == 0) {
+      resolve();
+    } else {
+      let transaction = db.transaction("quick", "readwrite");
+      for (let value of cin.unwrittenQuickList) {
+        transaction.objectStore("quick").add(value);
+      }
+      transaction.oncomplete = (event) => {
+        resolve();
+      };
+      transaction.onerror = (event) => {
+        reject("Cannot handle quick section...");
+      };
+    }
+  });
+  // 4. write chardef
+  let promiseCharDef = new Promise((resolve, reject) => {
+    if (!cin.unwrittenCharDefList || cin.unwrittenCharDefList.length == 0) {
+      resolve();
+    } else {
+      let transaction = db.transaction("chardef", "readwrite");
+      for (let value of cin.unwrittenCharDefList) {
+        transaction.objectStore("chardef").add(value);
+      }
+      transaction.oncomplete = (event) => {
+        resolve();
+      };
+      transaction.onerror = (event) => {
+        reject("Cannot handle chardef section...");
+      };
+    }
+  });
+  // 5. clear quick and chardef arrays
+  await Promise.all([
+    promiseSettings,
+    promiseKeyname,
+    promiseQuick,
+    promiseCharDef,
+  ]);
+  delete cin.unwrittenQuickList;
+  delete cin.unwrittenCharDefList;
+  return cin;
+}
 
-        Object.defineProperty(cin, "totalPage", {
-          get() {
-            if (!cin.candidateList) {
-              return 0;
-            } else {
-              let listSize = cin.dupsel;
-              if (cin.spaceStyle == 1) {
-                listSize++;
-              }
-              return Math.ceil(cin.candidateList.length / listSize);
-            }
-          },
-        });
-
-        Object.defineProperty(cin, "currentCandidateList", {
-          get() {
-            if (cin.candidateList || cin.candidateList.length > 0) {
-              let listSize = cin.dupsel;
-              if (cin.spaceStyle == 1) {
-                listSize++;
-              }
-              return cin.candidateList.slice(
-                (cin.currentPage - 1) * listSize,
-                Math.min(cin.currentPage * listSize, cin.candidateList.length)
-              );
-            } else {
-              return cin.candidateList;
-            }
-          },
-        });
-
-        let fireCandidateChange = function () {
-          if (cin.totalPage == 0) {
-            cin.currentPage = 0;
-          } else {
-            cin.currentPage = 1;
-          }
-          if (typeof cin.onCurrentCandidatesChange == "function") {
-            cin.onCurrentCandidatesChange(cin.currentCandidateList);
-          }
-          if (typeof cin.onCandidatesChange == "function") {
-            cin.onCandidatesChange(cin.candidateList);
-          }
-        };
-
-        cin.resetKeys = function () {
-          keys = "";
-          cin.candidateList = [];
-          status = STATUS_INPUT;
-          if (typeof cin.onKeynamesChange == "function") {
-            cin.onKeynamesChange("");
-          }
-          fireCandidateChange();
-        };
-
-        cin.deleteContentBackward = function () {
-          if (cin.enable) {
-            if (status == STATUS_INPUT) {
-              if (keys.length > 1) {
-                let theLastKey = keys.charAt(keys.length - 2);
-                keys = keys.substring(0, keys.length - 2);
-                cin.pushKey(theLastKey);
-                return true;
-              } else if (keys.length == 1) {
-                cin.resetKeys();
-                return true;
-              } else {
-                return false;
-              }
-            } else if (status == STATUS_SEL) {
-              cin.resetKeys();
-              return true;
-            }
-          } else {
-            return false;
-          }
-        };
-
-        cin.pushKey = async function (key) {
-          let commitText = function (text) {
-            keys = "";
-            cin.candidateList = [];
-            status = STATUS_INPUT;
-            if (typeof cin.onKeynamesChange == "function") {
-              cin.onKeynamesChange("");
-            }
-            fireCandidateChange();
-            if (typeof cin.onCommit == "function") {
-              cin.onCommit(text);
-            }
-          };
-
-          if (!cin.enable) {
-            commitText(key);
-            console.log(`Commit text:${key}`);
-            return;
-          } else {
-            console.log(`Push key:${key}`);
-          }
-
-          // lookup candidate from indexedDB
-          let transaction = cin.db.transaction(["quick", "chardef"]);
-          let isSpace = key == " ";
-          let isEndKey =
-            typeof cin.endkey == "string" && cin.endkey.indexOf(key) > -1;
-          let isSelKey =
-            typeof cin.selkey == "string" && cin.selkey.indexOf(key) > -1;
-          let isKeyname = typeof cin.keyname[key] == "string";
-
-          let getKeynamesFromKeys = function (keys) {
-            return keys
-              .split("")
-              .map((v) => cin.keyname[v])
-              .join("");
-          };
-
-          let getCandidatesFromQuick = async function (keys) {
-            return new Promise(function (resolve, reject) {
-              let candidateList = [];
-              transaction.objectStore("quick").get(keys).onsuccess = function (
-                event
-              ) {
-                if (event.target.result) {
-                  const candidatesStr = event.target.result.candidates;
-                  if (
-                    typeof candidatesStr == "string" &&
-                    candidatesStr.length > 0
-                  ) {
-                    candidateList = candidateList.concat(
-                      candidatesStr.split("")
-                    );
-                  }
-                }
-                resolve(candidateList);
-              };
-            });
-          };
-
-          let getCandidatesFromChardef = async function (keys) {
-            return new Promise(function (resolve, reject) {
-              let candidateList = [];
-              transaction
-                .objectStore("chardef")
-                .index("keycode")
-                .openCursor(IDBKeyRange.only(keys)).onsuccess = function (
-                event
-              ) {
-                const cursor = event.target.result;
-                if (cursor) {
-                  candidateList.push(cursor.value.candidate);
-                  cursor.continue();
-                } else {
-                  resolve(candidateList);
-                }
-              };
-            });
-          };
-
-          // start push key logic
-          let originalKeys = keys;
-          let originalCandidateList = cin.candidateList;
-          switch (status) {
-            case STATUS_INPUT:
-              let quickCandidateList;
-              let chardefCandidateList;
-              cin.candidateList = undefined;
-
-              if (isKeyname) {
-                keys += key;
-
-                if (
-                  cin.flagDispFullMatch ||
-                  isEndKey ||
-                  (cin.spaceStyle == 2 && keys.length == cin.maxNumOfKeys)
-                ) {
-                  quickCandidateList = await getCandidatesFromQuick(keys);
-
-                  if (quickCandidateList.length < 1) {
-                    chardefCandidateList = await getCandidatesFromChardef(keys);
-                  }
-                }
-              } else if (isSpace && !chardefCandidateList) {
-                chardefCandidateList = await getCandidatesFromChardef(keys);
-              }
-
-              if (quickCandidateList && quickCandidateList.length > 0) {
-                cin.candidateList = quickCandidateList;
-              } else {
-                cin.candidateList = chardefCandidateList;
-              }
-
-              if (
-                typeof cin.onKeynamesChange == "function" &&
-                (!isSelKey ||
-                  !originalCandidateList ||
-                  originalCandidateList.length == 0)
-              ) {
-                cin.onKeynamesChange(getKeynamesFromKeys(keys));
-              }
-
-              if (cin.flagDispFullMatch && cin.candidateList) {
-                fireCandidateChange();
-              }
-
-              if (
-                isEndKey ||
-                isSpace ||
-                (cin.spaceStyle == 2 && keys.length == cin.maxNumOfKeys)
-              ) {
-                if (cin.candidateList) {
-                  if (cin.candidateList.length > 1) {
-                    if (isSpace && cin.spaceStyle == 1) {
-                      commitText(cin.candidateList[0]);
-                      return;
-                    } else {
-                      status = STATUS_SEL;
-                      if (!cin.flagDispFullMatch) {
-                        fireCandidateChange();
-                      }
-                      if (typeof cin.onEndKey == "function") {
-                        cin.onEndKey(cin.currentCandidateList);
-                      }
-                      return;
-                    }
-                  } else if (cin.candidateList.length == 1) {
-                    commitText(cin.candidateList[0]);
-                    return;
-                  }
-                }
-              }
-
-              if (
-                isSelKey &&
-                originalKeys.length > 0 &&
-                originalCandidateList &&
-                originalCandidateList.length > 0
-              ) {
-                keys = originalKeys;
-                cin.candidateList = originalCandidateList;
-                fireCandidateChange();
-
-                let selectIndex = cin.selkey.indexOf(key);
-                if (cin.spaceStyle == 1) {
-                  selectIndex++;
-                }
-
-                if (cin.currentCandidateList.length > selectIndex) {
-                  commitText(cin.currentCandidateList[selectIndex]);
-                }
-                return;
-              }
-
-              if (!isKeyname) {
-                commitText(key);
-                return;
-              }
-
-              // Dirty handling of endkey
-              // if the mapping is not defined in cin file.
-              // It should be handled in cin file.
-              if (isEndKey && keys.length == 1) {
-                commitText(key);
-                return;
-              }
-              // End of dirty handling
-
-              break;
-
-            case STATUS_SEL:
-              if (isSelKey) {
-                let selectIndex = cin.selkey.indexOf(key);
-                if (cin.spaceStyle == 1) {
-                  selectIndex++;
-                }
-                if (cin.currentCandidateList.length > selectIndex) {
-                  commitText(cin.currentCandidateList[selectIndex]);
-                }
-                return;
-              } else if (isSpace) {
-                if (cin.totalPage > 1) {
-                  cin.nextCandidateList();
-                  return;
-                } else {
-                  // TODO may be based on space style (e.g. cangjie), no action
-                  commitText(cin.currentCandidateList[0]);
-                  return;
-                }
-              } else {
-                commitText(cin.currentCandidateList[0]);
-                cin.pushKey(key);
-                return;
-              }
-          }
-          //end push key logic
-        };
-
-        cin.previousCandidateList = function () {
-          if (cin.totalPage == 0) {
-            cin.currentPage = 0;
-            return false;
-          } else if (cin.currentPage == 1) {
-            cin.currentPage = cin.totalPage;
-          } else {
-            cin.currentPage--;
-          }
-          if (typeof cin.onCurrentCandidatesChange == "function") {
-            cin.onCurrentCandidatesChange(cin.currentCandidateList);
-          }
-          return true;
-        };
-
-        cin.nextCandidateList = function () {
-          if (cin.totalPage == 0) {
-            cin.currentPage = 0;
-            return false;
-          } else if (cin.currentPage == cin.totalPage) {
-            cin.currentPage = 1;
-          } else {
-            cin.currentPage++;
-          }
-          if (typeof cin.onCurrentCandidatesChange == "function") {
-            cin.onCurrentCandidatesChange(cin.currentCandidateList);
-          }
-          return true;
-        };
-
-        // Overrided methods
-        //              cin.onKeynamesChange = function(keynames) {};
-        //              cin.onCandidatesChange = function (candidates) {};
-        //              cin.onCurrentCandidatesChange = function (candidates) {};
-        //              cin.onEndKey = function (candidates) {};
-        //              cin.onCommit = function (text) {};
-        // End of overrided methods
-
-        return cin;
-      });
-  },
-};
-/*
- * end of CinLoader
- */
+export { handleSection, writeToDB };
