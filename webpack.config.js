@@ -17,7 +17,7 @@ module.exports = {
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
   },
-  plugins: [new HtmlWebpackPlugin({ title: "CIN Notepad" })],
+  plugins: [new HtmlWebpackPlugin({ title: "CINotepad" })],
   output: {
     filename: "main.js",
     path: path.resolve(__dirname, "dist"),
