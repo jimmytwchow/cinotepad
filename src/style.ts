@@ -7,6 +7,9 @@ const styles = [
       padding: "0px",
       margin: "0px",
     },
+    ".cinotepad-candidates-button": {
+      "vertical-align": "bottom",
+    },
   },
 ];
 

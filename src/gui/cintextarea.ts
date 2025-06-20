@@ -191,6 +191,7 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
           currentPage: displayCurrentPage,
           totalPages: displayTotalPages,
           events: {
+            oncandidateselected: (e) => cin.pushKey(e.selkey),
             onprevpage: () => cin.previousCandidateList(),
             onnextpage: () => cin.nextCandidateList(),
           },
@@ -210,7 +211,6 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
             offsetH: "0px",
             offsetV: "0px",
             show: candidates.length > 0 || keynames.length > 0,
-            // show: true,
             verticalSelection: cin.flagVerticalSelection,
             imeName: cin.cname,
             keynames: keynames,
