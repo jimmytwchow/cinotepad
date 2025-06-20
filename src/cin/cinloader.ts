@@ -1,5 +1,5 @@
-import JSTextDecoderStream from "./jstextdecoderstream";
-import JSLineStream from "./jslinestream";
+import JSTextDecoderStream from "../stream/jstextdecoderstream";
+import JSLineStream from "../stream/jslinestream";
 import { SpaceStyle, Keynames, QuickRecord, CharDefRecord, Cin } from "./cin";
 
 function indexOfWhiteSpace(line: string): number {

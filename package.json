@@ -1,6 +1,6 @@
 {
   "name": "cinotepad",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "CINotepad is an online input method editor(IME) that allows users to load their own CIN file or provide a URL of CIN file so that you can use your customized input method.",
   "private": true,
   "scripts": {
@@ -13,6 +13,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/mithril": "^2.2.7",
+    "@types/textarea-caret": "^3.0.4",
     "html-webpack-plugin": "^5.6.3",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
@@ -23,6 +24,7 @@
     "mithril": "^2.3.0",
     "mmsvg": "^1.5.3",
     "polythene-css": "^1.7.5",
-    "polythene-mithril": "^1.7.5"
+    "polythene-mithril": "^1.7.5",
+    "textarea-caret": "^3.1.0"
   }
 }

@@ -1,19 +1,19 @@
 import "./style.ts";
-import { Cin } from "./cin";
-import { loadFromStream } from "./cinloader";
+import { Cin } from "./cin/cin";
+import { loadFromStream } from "./cin/cinloader";
 import m from "mithril";
-import iconUpload from "mmsvg/google/msvg/file/file-upload";
 import {
   Toolbar,
   ToolbarTitle,
-  IconButton,
   Button,
-  TextField,
   MaterialDesignSpinner as Spinner,
   Dialog,
   onChangeTextFieldState,
 } from "polythene-mithril";
 import { addLayoutStyles, addTypography } from "polythene-css";
+import getCaretCoordinates from "textarea-caret";
+import { FileInput } from "./gui/fileinput";
+import { CinTextArea } from "./gui/cintextarea";
 
 addLayoutStyles();
 addTypography();
@@ -27,45 +27,9 @@ interface AppState {
   cinEnable: boolean;
   keynames: string;
   candidates: string[];
+  needCandidatesSizeChecking: boolean;
   onChangeTextFieldState?: onChangeTextFieldState;
 }
-
-interface FileInputAttrs {
-  label?: string;
-  disabled?: boolean;
-  events?: { onchange?(e: Event): void; oncanel?(e: Event): void };
-}
-
-const FileInput: m.Component<FileInputAttrs> = {
-  view(vnode) {
-    return m(IconButton, {
-      icon: { svg: { content: iconUpload } },
-      label: vnode.attrs.label,
-      // raised: true,
-      disabled: vnode.attrs.disabled ?? false,
-      events: {
-        onclick: (e: Event) => {
-          let previousEl = (e.target as HTMLElement).previousElementSibling;
-          if (previousEl) {
-            if (previousEl instanceof HTMLInputElement) {
-              (previousEl as HTMLInputElement).click();
-            } else {
-              // handle the case when user clicks the label.
-              previousEl = previousEl.previousElementSibling;
-              if (previousEl && previousEl instanceof HTMLInputElement) {
-                (previousEl as HTMLInputElement).click();
-              }
-            }
-          }
-        },
-      },
-      before: m("input.pe-hidden", {
-        type: "file",
-        onchange: vnode.attrs.events?.onchange ?? (() => {}),
-      }),
-    });
-  },
-};
 
 const App: m.Component<AppAttrs, AppState> = {
   oninit(vnode) {
@@ -74,8 +38,11 @@ const App: m.Component<AppAttrs, AppState> = {
     vnode.state.cinEnable = true;
     vnode.state.keynames = "";
     vnode.state.candidates = [];
+    vnode.state.needCandidatesSizeChecking = false;
   },
   view(vnode) {
+    let needCandidatesSizeChecking = vnode.state.needCandidatesSizeChecking;
+    vnode.state.needCandidatesSizeChecking = false;
     return [
       m(Toolbar, { border: true }, [
         m(ToolbarTitle, { text: "CINotepad" }),
@@ -137,12 +104,14 @@ const App: m.Component<AppAttrs, AppState> = {
 
                       cin.onKeynamesChange = function (keynames: string) {
                         vnode.state.keynames = keynames;
+                        vnode.state.needCandidatesSizeChecking = true;
                         m.redraw();
                       };
                       cin.onCurrentCandidatesChange = function (
                         candidates: string[]
                       ) {
                         vnode.state.candidates = candidates;
+                        vnode.state.needCandidatesSizeChecking = true;
                         m.redraw();
                       };
                       cin.onCommit = function (text: string) {
@@ -193,106 +162,13 @@ const App: m.Component<AppAttrs, AppState> = {
           },
         }),
       ]),
-      m("div", { style: "min-height: 3em" }, [
-        m("div", [
-          m("span", vnode.state.activeCin?.cname ?? ""),
-          m("span.pe-inline-block", { style: "width:1em;" }),
-          m("span", vnode.state.keynames),
-        ]),
-        m(
-          "div",
-          (() => {
-            const result = vnode.state.candidates
-              .map((v, i) => {
-                if (vnode.state.activeCin) {
-                  const cin = vnode.state.activeCin as Cin;
-                  if (cin.spaceStyle == 1) {
-                    i--;
-                  }
-                  return [
-                    m(
-                      "span.pe-inline-block",
-                      {
-                        style: "width:1em; text-align:right; color: darkgrey;",
-                      },
-                      i < 0 ? " " : cin.selkey.charAt(i)
-                    ),
-                    m("span", v),
-                  ];
-                } else {
-                  return [];
-                }
-              })
-              .flat();
-            if (vnode.state.activeCin) {
-              const cin = vnode.state.activeCin as Cin;
-              if (cin.totalPage > 1) {
-                result.push(
-                  m(
-                    "a.pe-inline-block",
-                    {
-                      href: "#",
-                      style: "width:1.5em; text-align:center;",
-                      onclick: () => cin.previousCandidateList(),
-                    },
-                    "<"
-                  )
-                );
-                result.push(
-                  m(
-                    "a.pe-inline-block",
-                    {
-                      href: "#",
-                      style: "width:1.5em; text-align:center;",
-                      onclick: () => cin.nextCandidateList(),
-                    },
-                    ">"
-                  )
-                );
-              }
-            }
-            return result;
-          })()
-        ),
-      ]),
-      m(TextField, {
-        label: "請輸入…",
-        multiLine: true,
-        rows: 20,
+      m(CinTextArea, {
+        activeCin: vnode.state.activeCin,
+        keynames: vnode.state.keynames,
+        candidates: vnode.state.candidates,
+        needCandidatesSizeChecking,
         onChange: (state: onChangeTextFieldState) => {
           vnode.state.onChangeTextFieldState = state;
-        },
-        events: {
-          onbeforeinput: (e: InputEvent) => {
-            if (vnode.state.activeCin) {
-              const cin = vnode.state.activeCin as Cin;
-              if (e.inputType == "insertText") {
-                cin.pushKey(e.data as string);
-                e.preventDefault();
-              } else if (e.inputType == "deleteContentBackward") {
-                if (cin.deleteContentBackward()) {
-                  e.preventDefault();
-                }
-              }
-            }
-          },
-          onkeydown: (e: KeyboardEvent) => {
-            if (vnode.state.activeCin) {
-              const cin = vnode.state.activeCin as Cin;
-              if (e.key == "Escape") {
-                cin.resetKeys();
-                e.preventDefault();
-              } else if (e.key == "PageUp") {
-                if (cin.previousCandidateList()) {
-                  e.preventDefault();
-                }
-              } else if (e.key == "PageDown") {
-                if (cin.nextCandidateList()) {
-                  e.preventDefault();
-                }
-              }
-            }
-          },
         },
       }),
       m(Dialog),
