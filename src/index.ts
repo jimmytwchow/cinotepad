@@ -14,6 +14,7 @@ import { addLayoutStyles, addTypography } from "polythene-css";
 import getCaretCoordinates from "textarea-caret";
 import { FileInput } from "./gui/fileinput";
 import { CinTextArea } from "./gui/cintextarea";
+import { CinsDropDown } from "./gui/cinsdropdown";
 
 addLayoutStyles();
 addTypography();
@@ -22,8 +23,8 @@ interface AppAttrs {}
 
 interface AppState {
   activeCin?: Cin;
+  cins: Cin[];
   btnLoadElLabel: string;
-  btnLoadElDisabled: boolean;
   cinEnable: boolean;
   keynames: string;
   candidates: string[];
@@ -33,8 +34,8 @@ interface AppState {
 
 const App: m.Component<AppAttrs, AppState> = {
   oninit(vnode) {
+    vnode.state.cins = [] as Cin[];
     vnode.state.btnLoadElLabel = "上傳CIN檔案";
-    vnode.state.btnLoadElDisabled = false;
     vnode.state.cinEnable = true;
     vnode.state.keynames = "";
     vnode.state.candidates = [];
@@ -46,6 +47,13 @@ const App: m.Component<AppAttrs, AppState> = {
     return [
       m(Toolbar, { border: true }, [
         m(ToolbarTitle, { text: "CINotepad" }),
+        m(CinsDropDown, {
+          activeCin: vnode.state.activeCin,
+          cins: vnode.state.cins,
+          events: {
+            oncinselected: (e) => (vnode.state.activeCin = e.cin),
+          },
+        }),
         m(Button, {
           label: vnode.state.cinEnable ? "中" : "英",
           events: {
@@ -65,7 +73,6 @@ const App: m.Component<AppAttrs, AppState> = {
         }),
         m(FileInput, {
           label: vnode.state.btnLoadElLabel,
-          disabled: vnode.state.btnLoadElDisabled,
           events: {
             onchange: (e: Event) => {
               const btnLoadEle = e.target as HTMLInputElement;
@@ -89,7 +96,6 @@ const App: m.Component<AppAttrs, AppState> = {
                     ),
                   });
                   vnode.state.btnLoadElLabel = "上傳中…";
-                  vnode.state.btnLoadElDisabled = true;
 
                   const cinFile: File = files[0];
                   const fileReadStream: ReadableStream = cinFile.stream();
@@ -99,8 +105,9 @@ const App: m.Component<AppAttrs, AppState> = {
                       Dialog.hide();
 
                       vnode.state.activeCin = cin;
+                      vnode.state.cins.push(cin);
 
-                      vnode.state.btnLoadElLabel = "完成";
+                      vnode.state.btnLoadElLabel = "上傳CIN檔案";
 
                       cin.onKeynamesChange = function (keynames: string) {
                         vnode.state.keynames = keynames;
@@ -151,7 +158,6 @@ const App: m.Component<AppAttrs, AppState> = {
                       m.redraw();
                     })
                     .catch((error: Error) => {
-                      vnode.state.btnLoadElDisabled = false;
                       Dialog.hide();
                       m.redraw();
                       Promise.reject(error);
