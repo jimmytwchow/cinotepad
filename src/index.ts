@@ -1,6 +1,6 @@
 import "./style.ts";
 import { Cin } from "./cin/cin";
-import { loadFromStream } from "./cin/cinloader";
+import { loadFromStream, deleteFromDB } from "./cin/cinloader";
 import m from "mithril";
 import {
   Toolbar,
@@ -52,6 +52,13 @@ const App: m.Component<AppAttrs, AppState> = {
           cins: vnode.state.cins,
           events: {
             oncinselected: (e) => (vnode.state.activeCin = e.cin),
+            oncindeleted: (e) => {
+              deleteFromDB(e.cin).catch((err) => console.error(err));
+              vnode.state.cins.splice(vnode.state.cins.indexOf(e.cin), 1);
+              if (vnode.state.activeCin == e.cin) {
+                delete vnode.state.activeCin;
+              }
+            },
           },
         }),
         m(Button, {

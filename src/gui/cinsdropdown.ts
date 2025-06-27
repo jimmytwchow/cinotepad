@@ -1,5 +1,6 @@
 import m from "mithril";
-import { Button, List, ListTile, Menu } from "polythene-mithril";
+import iconDelete from "mmsvg/google/msvg/action/delete";
+import { Button, IconButton, List, ListTile, Menu } from "polythene-mithril";
 import { Cin } from "../cin/cin";
 
 const ATTR_CINS_DEFAULT = [] as Cin[];
@@ -8,11 +9,16 @@ interface CinSelectedEvent extends Event {
   cin: Cin;
 }
 
+interface CinDeletedEvent extends Event {
+  cin: Cin;
+}
+
 interface CinsDropDownAttrs {
   activeCin?: Cin;
   cins?: Cin[];
   events?: {
     oncinselected?(e: CinSelectedEvent): void;
+    oncindeleted?(e: CinDeletedEvent): void;
   };
 }
 
@@ -47,6 +53,20 @@ const CinsDropDown: m.Component<CinsDropDownAttrs, CinsDropDownState> = {
                     vnode.attrs.events?.oncinselected(cse);
                   }
                 },
+              },
+              secondary: {
+                content: m(IconButton, {
+                  icon: { svg: { content: iconDelete }, size: "small" },
+                  compact: true,
+                  events: {
+                    onclick: (e: Event) => {
+                      if (vnode.attrs.events?.oncindeleted) {
+                        const cde: CinDeletedEvent = { ...e, cin };
+                        vnode.attrs.events?.oncindeleted(cde);
+                      }
+                    },
+                  },
+                }),
               },
             })
           ),

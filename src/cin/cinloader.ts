@@ -414,4 +414,22 @@ async function loadFromStream(
   return cin;
 }
 
-export { loadFromStream };
+async function deleteFromDB(cin: Cin): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (cin.dbName) {
+      const deleteReq: IDBOpenDBRequest = indexedDB.deleteDatabase(
+        cin.dbName as string
+      );
+      deleteReq.onsuccess = function () {
+        resolve();
+      };
+      deleteReq.onerror = function () {
+        reject(`Cannot delete IndexedDB for the file ${cin.dbName}`);
+      };
+    } else {
+      reject("CIN file was not loaded to IndexedDB before.");
+    }
+  });
+}
+
+export { loadFromStream, deleteFromDB };
