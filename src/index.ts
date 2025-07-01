@@ -1,6 +1,6 @@
 import "./style.ts";
 import { Cin } from "./cin/cin";
-import { loadFromStream, deleteFromDB } from "./cin/cinloader";
+import { loadAllFromDB, loadFromStream, deleteFromDB } from "./cin/cinloader";
 import m from "mithril";
 import {
   Toolbar,
@@ -32,6 +32,48 @@ interface AppState {
   onChangeTextFieldState?: onChangeTextFieldState;
 }
 
+function initCinEventHandlers(
+  cin: Cin,
+  vnode: m.Vnode<AppAttrs, AppState>
+): void {
+  cin.onKeynamesChange = function (keynames: string) {
+    vnode.state.keynames = keynames;
+    vnode.state.needCandidatesSizeChecking = true;
+    m.redraw();
+  };
+
+  cin.onCurrentCandidatesChange = function (candidates: string[]) {
+    vnode.state.candidates = candidates;
+    vnode.state.needCandidatesSizeChecking = true;
+    m.redraw();
+  };
+
+  cin.onCommit = function (text: string) {
+    if (vnode.state.onChangeTextFieldState) {
+      const { setInputState, el: element } = vnode.state
+        .onChangeTextFieldState as onChangeTextFieldState;
+      const el = element as HTMLTextAreaElement;
+      const newSelectionPos: number = el.selectionStart + text.length;
+      const leftText: string = el.value.substring(0, el.selectionStart);
+      const rightText: string = el.value.substring(el.selectionEnd);
+      setInputState({
+        focus: true,
+        value: leftText + text + rightText,
+      });
+      el.setSelectionRange(newSelectionPos, newSelectionPos);
+    }
+    m.redraw();
+  };
+}
+
+function focusTextField(vnode: m.Vnode<AppAttrs, AppState>) {
+  if (vnode.state.onChangeTextFieldState) {
+    const { setInputState, value } = vnode.state
+      .onChangeTextFieldState as onChangeTextFieldState;
+    setInputState({ focus: true, value });
+  }
+}
+
 const App: m.Component<AppAttrs, AppState> = {
   oninit(vnode) {
     vnode.state.cins = [] as Cin[];
@@ -40,6 +82,14 @@ const App: m.Component<AppAttrs, AppState> = {
     vnode.state.keynames = "";
     vnode.state.candidates = [];
     vnode.state.needCandidatesSizeChecking = false;
+    loadAllFromDB().then((cins) => {
+      vnode.state.cins = cins;
+      for (let cin of cins) {
+        initCinEventHandlers(cin, vnode);
+        cin.enable = vnode.state.cinEnable;
+      }
+      m.redraw();
+    });
   },
   view(vnode) {
     let needCandidatesSizeChecking = vnode.state.needCandidatesSizeChecking;
@@ -51,13 +101,18 @@ const App: m.Component<AppAttrs, AppState> = {
           activeCin: vnode.state.activeCin,
           cins: vnode.state.cins,
           events: {
-            oncinselected: (e) => (vnode.state.activeCin = e.cin),
+            oncinselected: (e) => {
+              vnode.state.activeCin = e.cin;
+              vnode.state.activeCin.enable = vnode.state.cinEnable;
+              focusTextField(vnode);
+            },
             oncindeleted: (e) => {
               deleteFromDB(e.cin).catch((err) => console.error(err));
               vnode.state.cins.splice(vnode.state.cins.indexOf(e.cin), 1);
               if (vnode.state.activeCin == e.cin) {
                 delete vnode.state.activeCin;
               }
+              focusTextField(vnode);
             },
           },
         }),
@@ -70,11 +125,7 @@ const App: m.Component<AppAttrs, AppState> = {
                 const cin = vnode.state.activeCin as Cin;
                 cin.enable = vnode.state.cinEnable;
               }
-              if (vnode.state.onChangeTextFieldState) {
-                const { setInputState, value } = vnode.state
-                  .onChangeTextFieldState as onChangeTextFieldState;
-                setInputState({ focus: true, value });
-              }
+              focusTextField(vnode);
             },
           },
         }),
@@ -116,51 +167,11 @@ const App: m.Component<AppAttrs, AppState> = {
 
                       vnode.state.btnLoadElLabel = "上傳CIN檔案";
 
-                      cin.onKeynamesChange = function (keynames: string) {
-                        vnode.state.keynames = keynames;
-                        vnode.state.needCandidatesSizeChecking = true;
-                        m.redraw();
-                      };
-                      cin.onCurrentCandidatesChange = function (
-                        candidates: string[]
-                      ) {
-                        vnode.state.candidates = candidates;
-                        vnode.state.needCandidatesSizeChecking = true;
-                        m.redraw();
-                      };
-                      cin.onCommit = function (text: string) {
-                        if (vnode.state.onChangeTextFieldState) {
-                          const { setInputState, el: element } = vnode.state
-                            .onChangeTextFieldState as onChangeTextFieldState;
-                          const el = element as HTMLTextAreaElement;
-                          const newSelectionPos: number =
-                            el.selectionStart + text.length;
-                          const leftText: string = el.value.substring(
-                            0,
-                            el.selectionStart
-                          );
-                          const rightText: string = el.value.substring(
-                            el.selectionEnd
-                          );
-                          setInputState({
-                            focus: true,
-                            value: leftText + text + rightText,
-                          });
-                          el.setSelectionRange(
-                            newSelectionPos,
-                            newSelectionPos
-                          );
-                        }
-                        m.redraw();
-                      };
+                      initCinEventHandlers(cin, vnode);
 
                       cin.enable = vnode.state.cinEnable;
 
-                      if (vnode.state.onChangeTextFieldState) {
-                        const { setInputState, value } = vnode.state
-                          .onChangeTextFieldState as onChangeTextFieldState;
-                        setInputState({ focus: true, value });
-                      }
+                      focusTextField(vnode);
 
                       m.redraw();
                     })
@@ -190,3 +201,15 @@ const App: m.Component<AppAttrs, AppState> = {
 };
 
 m.mount((document.getElementsByTagName("body") as HTMLCollection)[0], App);
+
+// Register service worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .then((registration) => console.log("SW registered."))
+      .catch((registrationError) =>
+        console.error("SW registration failed: ", registrationError)
+      );
+  });
+}

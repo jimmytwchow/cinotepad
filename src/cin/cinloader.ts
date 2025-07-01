@@ -316,6 +316,12 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
       name: "%flag_unique_auto_send",
       value: cin.flagUniqueAutoSend,
     });
+    // "%max_num_of_keys": customized setting
+    // Used at CINotepad only.
+    // Calculated from quick and chardef records.
+    transaction
+      .objectStore("settings")
+      .add({ name: "%max_num_of_keys", value: cin.maxNumOfKeys });
     transaction.oncomplete = (event: Event) => {
       resolve();
     };
@@ -414,7 +420,116 @@ async function loadFromStream(
   return cin;
 }
 
+async function loadFromDB(dbName: string): Promise<Cin> {
+  // Open database first
+  const db: IDBDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
+    const openReq: IDBOpenDBRequest = indexedDB.open(dbName);
+    openReq.onsuccess = function (event) {
+      resolve(openReq.result as IDBDatabase);
+    };
+    openReq.onerror = function () {
+      reject(`Cannot open IndexedDB for the file ${dbName}`);
+    };
+  });
+
+  const cin = new Cin();
+  cin.db = db;
+  cin.dbName = dbName;
+  // load from db
+  // 1. read settings
+  const promiseSettings = new Promise<void>((resolve, reject) => {
+    db.transaction("settings").objectStore("settings").getAll().onsuccess =
+      function (e: Event) {
+        const recordList = (event.target as IDBRequest).result;
+        for (let record of recordList) {
+          switch (record.name) {
+            case "%ename":
+              cin.ename = record.value;
+              break;
+            case "%cname":
+              cin.cname = record.value;
+              break;
+            case "%prompt":
+              cin.prompt = record.value;
+              break;
+            case "%selkey":
+              cin.selkey = record.value;
+              break;
+            case "%dupsel":
+              cin.dupsel = record.value;
+              break;
+            case "%endkey":
+              cin.endkey = record.value;
+              break;
+            case "%space_style":
+              cin.spaceStyle = record.value;
+              break;
+            case "%keep_key_case":
+              cin.keepKeyCase = record.value;
+              break;
+            case "%symbol_kbm":
+              cin.symbolKbm = record.value;
+              break;
+            case "%phase_auto_skip_endkey":
+              cin.phaseAutoSkipEndKey = record.value;
+              break;
+            case "%flag_auto_select_by_phrase":
+              cin.flagAutoSelectByPhase = record.value;
+              break;
+            case "%flag_disp_partial_match":
+              cin.flagDispPartialMatch = record.value;
+              break;
+            case "%flag_disp_full_match":
+              cin.flagDispFullMatch = record.value;
+              break;
+            case "%flag_vertical_selection":
+              cin.flagVerticalSelection = record.value;
+              break;
+            case "%flag_press_full_auto_send":
+              cin.flagPressFullAutoSend = record.value;
+              break;
+            case "%flag_unique_auto_send":
+              cin.flagUniqueAutoSend = record.value;
+              break;
+            case "%max_num_of_keys":
+              cin.maxNumOfKeys = record.value;
+              break;
+          }
+        }
+        resolve();
+      };
+  });
+  // 2. read keynames
+  const promiseKeyname = new Promise<void>((resolve, reject) => {
+    db.transaction("keyname").objectStore("keyname").getAll().onsuccess =
+      function (e: Event) {
+        const recordList = (event.target as IDBRequest).result;
+        for (let record of recordList) {
+          cin.keyname[record.key] = record.keyname;
+        }
+        resolve();
+      };
+  });
+  await Promise.all([promiseSettings, promiseKeyname]);
+  return cin;
+}
+
+async function loadAllFromDB(): Promise<Cin[]> {
+  let dbs = await indexedDB.databases();
+  dbs = dbs.filter(
+    (db) => db.name.startsWith("cin_") && db.name.endsWith(".cin")
+  );
+  return Promise.all(
+    dbs.map(async (db): Promise<Cin> => await loadFromDB(db.name))
+  );
+}
+
 async function deleteFromDB(cin: Cin): Promise<void> {
+  if (cin.db) {
+    cin.db.close();
+  } else {
+    throw "CIN file was not loaded to IndexedDB before.";
+  }
   return new Promise<void>((resolve, reject) => {
     if (cin.dbName) {
       const deleteReq: IDBOpenDBRequest = indexedDB.deleteDatabase(
@@ -432,4 +547,4 @@ async function deleteFromDB(cin: Cin): Promise<void> {
   });
 }
 
-export { loadFromStream, deleteFromDB };
+export { loadFromStream, loadFromDB, loadAllFromDB, deleteFromDB };
