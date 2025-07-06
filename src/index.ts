@@ -6,15 +6,13 @@ import {
   Toolbar,
   ToolbarTitle,
   Button,
-  MaterialDesignSpinner as Spinner,
   Dialog,
   onChangeTextFieldState,
 } from "polythene-mithril";
 import { addLayoutStyles, addTypography } from "polythene-css";
-import getCaretCoordinates from "textarea-caret";
-import { FileInput } from "./gui/fileinput";
-import { CinTextArea } from "./gui/cintextarea";
 import { CinsDropDown } from "./gui/cinsdropdown";
+import { CinTextArea } from "./gui/cintextarea";
+import { showMessageDialog } from "./gui/dialog";
 
 addLayoutStyles();
 addTypography();
@@ -24,7 +22,6 @@ interface AppAttrs {}
 interface AppState {
   activeCin?: Cin;
   cins: Cin[];
-  btnLoadElLabel: string;
   cinEnable: boolean;
   keynames: string;
   candidates: string[];
@@ -77,7 +74,6 @@ function focusTextField(vnode: m.Vnode<AppAttrs, AppState>) {
 const App: m.Component<AppAttrs, AppState> = {
   oninit(vnode) {
     vnode.state.cins = [] as Cin[];
-    vnode.state.btnLoadElLabel = "上傳CIN檔案";
     vnode.state.cinEnable = true;
     vnode.state.keynames = "";
     vnode.state.candidates = [];
@@ -107,12 +103,38 @@ const App: m.Component<AppAttrs, AppState> = {
               focusTextField(vnode);
             },
             oncindeleted: (e) => {
-              deleteFromDB(e.cin).catch((err) => console.error(err));
+              deleteFromDB(e.cin).catch((err: Error) => {
+                showMessageDialog(err.message);
+                console.error(err);
+              });
               vnode.state.cins.splice(vnode.state.cins.indexOf(e.cin), 1);
               if (vnode.state.activeCin == e.cin) {
                 delete vnode.state.activeCin;
               }
               focusTextField(vnode);
+            },
+            oncinimported: (e) => {
+              loadFromStream(e.cinID, e.stream)
+                .then((cin) => {
+                  Dialog.hide();
+
+                  vnode.state.activeCin = cin;
+                  vnode.state.cins.push(cin);
+
+                  initCinEventHandlers(cin, vnode);
+
+                  cin.enable = vnode.state.cinEnable;
+
+                  focusTextField(vnode);
+
+                  m.redraw();
+                })
+                .catch((err: Error) => {
+                  Dialog.hide().then(() => {
+                    showMessageDialog(err.message);
+                    console.error(err);
+                  });
+                });
             },
           },
         }),
@@ -126,62 +148,6 @@ const App: m.Component<AppAttrs, AppState> = {
                 cin.enable = vnode.state.cinEnable;
               }
               focusTextField(vnode);
-            },
-          },
-        }),
-        m(FileInput, {
-          label: vnode.state.btnLoadElLabel,
-          events: {
-            onchange: (e: Event) => {
-              const btnLoadEle = e.target as HTMLInputElement;
-              if (btnLoadEle.files) {
-                const files = btnLoadEle.files as FileList;
-
-                if (files.length > 0) {
-                  Dialog.show({
-                    backdrop: true,
-                    modal: true,
-                    disableEscape: true,
-                    title: "載入中，請等候…",
-                    body: m(
-                      "div",
-                      { style: { height: "60px" } },
-                      m(Spinner, {
-                        style: { margin: "auto" },
-                        permanent: true,
-                        size: "large",
-                      })
-                    ),
-                  });
-                  vnode.state.btnLoadElLabel = "上傳中…";
-
-                  const cinFile: File = files[0];
-                  const fileReadStream: ReadableStream = cinFile.stream();
-
-                  loadFromStream(cinFile.name, fileReadStream)
-                    .then((cin) => {
-                      Dialog.hide();
-
-                      vnode.state.activeCin = cin;
-                      vnode.state.cins.push(cin);
-
-                      vnode.state.btnLoadElLabel = "上傳CIN檔案";
-
-                      initCinEventHandlers(cin, vnode);
-
-                      cin.enable = vnode.state.cinEnable;
-
-                      focusTextField(vnode);
-
-                      m.redraw();
-                    })
-                    .catch((error: Error) => {
-                      Dialog.hide();
-                      m.redraw();
-                      Promise.reject(error);
-                    });
-                }
-              }
             },
           },
         }),

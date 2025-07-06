@@ -20,7 +20,11 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({ title: "CINotepad" }),
-    new WorkboxPlugin.GenerateSW({ clientsClaim: true, skipWaiting: true }),
+    new WorkboxPlugin.GenerateSW({
+      clientsClaim: true,
+      skipWaiting: true,
+      maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+    }),
   ],
   output: {
     filename: "main.js",

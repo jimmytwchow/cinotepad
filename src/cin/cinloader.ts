@@ -126,6 +126,9 @@ async function handleSection(
 ): Promise<Cin> {
   const { done, value }: ReadableStreamReadResult<any> = await reader.read();
   if (done) {
+    if (cin.cname.length == 0) {
+      cin.cname = cin.ename;
+    }
     if (cin.dupsel < 0 || isNaN(cin.dupsel)) {
       cin.dupsel = cin.selkey.length;
     }
@@ -212,6 +215,16 @@ async function handleSection(
   }
 }
 
+function validateCin(cin: Cin): void {
+  if (
+    cin.ename.length == 0 ||
+    Object.keys(cin.keyname).length == 0 ||
+    !cin.unwrittenCharDefList
+  ) {
+    throw new Error("無效的CIN檔案");
+  }
+}
+
 async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
   // Open database first
   let db: IDBDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -232,7 +245,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
       objS.createIndex("keycode", "keycode", { unique: false });
     };
     openReq.onerror = function () {
-      reject(`Cannot open IndexedDB for the file ${dbName}`);
+      reject(new Error(`Cannot open IndexedDB for the file ${dbName}`));
     };
   });
 
@@ -253,7 +266,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
       resolve();
     };
     transaction.onerror = (event: Event) => {
-      reject("Error when clearing old data...");
+      reject(new Error("Error when clearing old data..."));
     };
   });
 
@@ -326,7 +339,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
       resolve();
     };
     transaction.onerror = (event: Event) => {
-      reject("Cannot handle settings...");
+      reject(new Error("Cannot handle settings..."));
     };
   });
 
@@ -346,7 +359,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
         resolve();
       };
       transaction.onerror = (event: Event) => {
-        reject("Cannot handle keyname section...");
+        reject(new Error("Cannot handle keyname section..."));
       };
     }
   });
@@ -366,7 +379,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
         resolve();
       };
       transaction.onerror = (event: Event) => {
-        reject("Cannot handle quick section...");
+        reject(new Error("Cannot handle quick section..."));
       };
     }
   });
@@ -386,7 +399,7 @@ async function writeToDB(cin: Cin, dbName: string): Promise<Cin> {
         resolve();
       };
       transaction.onerror = (event: Event) => {
-        reject("Cannot handle chardef section...");
+        reject(new Error("Cannot handle chardef section..."));
       };
     }
   });
@@ -416,6 +429,7 @@ async function loadFromStream(
   let cin = new Cin();
   cin.dupsel = -1; // Unset dupsel before reading data from cin file.
   cin = await handleSection(reader, cin);
+  validateCin(cin);
   cin = await writeToDB(cin, dbName);
   return cin;
 }
@@ -428,7 +442,7 @@ async function loadFromDB(dbName: string): Promise<Cin> {
       resolve(openReq.result as IDBDatabase);
     };
     openReq.onerror = function () {
-      reject(`Cannot open IndexedDB for the file ${dbName}`);
+      reject(new Error(`Cannot open IndexedDB for the file ${dbName}`));
     };
   });
 
@@ -528,7 +542,7 @@ async function deleteFromDB(cin: Cin): Promise<void> {
   if (cin.db) {
     cin.db.close();
   } else {
-    throw "CIN file was not loaded to IndexedDB before.";
+    throw new Error("CIN file was not loaded to IndexedDB before.");
   }
   return new Promise<void>((resolve, reject) => {
     if (cin.dbName) {
@@ -539,10 +553,10 @@ async function deleteFromDB(cin: Cin): Promise<void> {
         resolve();
       };
       deleteReq.onerror = function () {
-        reject(`Cannot delete IndexedDB for the file ${cin.dbName}`);
+        reject(new Error(`Cannot delete IndexedDB for the file ${cin.dbName}`));
       };
     } else {
-      reject("CIN file was not loaded to IndexedDB before.");
+      reject(new Error("CIN file was not loaded to IndexedDB before."));
     }
   });
 }
