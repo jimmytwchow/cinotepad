@@ -33,9 +33,9 @@ class Cin {
     this.symbolKbm = false; //Not implement yet.
     this.phaseAutoSkipEndKey = false; // Unused: No implementation of phrase input
     this.flagAutoSelectByPhase = false; // Unused: No implementation of phrase input
-    this.flagDispPartialMatch = false; //Not implement yet.
+    this.flagDispPartialMatch = false;
     this.flagDispFullMatch = false;
-    this.flagVerticalSelection = false; //Not implement yet.
+    this.flagVerticalSelection = false;
     this.flagPressFullAutoSend = false; //Not implement yet.
     this.flagUniqueAutoSend = false; //Not implement yet.
     // end of init default setting
@@ -55,7 +55,7 @@ class Cin {
   public dbName?: string;
   public db?: IDBDatabase;
 
-  public candidateList: string[];
+  public candidateList: CharDefRecord[];
   public currentPage: number;
   public maxNumOfKeys: number;
 
@@ -75,9 +75,9 @@ class Cin {
   public symbolKbm: boolean; //Not implement yet.
   public phaseAutoSkipEndKey: boolean; // Unused: No implementation of phrase input
   public flagAutoSelectByPhase: boolean; // Unused: No implementation of phrase input
-  public flagDispPartialMatch: boolean; //Not implement yet.
+  public flagDispPartialMatch: boolean;
   public flagDispFullMatch: boolean;
-  public flagVerticalSelection: boolean; //Not implement yet.
+  public flagVerticalSelection: boolean;
   public flagPressFullAutoSend: boolean; //Not implement yet.
   public flagUniqueAutoSend: boolean; //Not implement yet.
 
@@ -111,7 +111,7 @@ class Cin {
     }
   }
 
-  public get currentCandidateList(): string[] {
+  public get currentCandidateList(): CharDefRecord[] {
     if (this.candidateList.length > 0) {
       let listSize = this.dupsel;
       if (this.spaceStyle == 1) {
@@ -144,6 +144,13 @@ class Cin {
   // End of private used method
 
   // Public methods implementation
+  public getKeynamesFromKeys(keys: string): string {
+    return keys
+      .split("")
+      .map((v) => this.keyname[v])
+      .join("");
+  }
+
   public resetKeys() {
     this._keys = "";
     this.candidateList = [];
@@ -213,18 +220,11 @@ class Cin {
     const isSelKey: boolean = cin.selkey.indexOf(key) > -1;
     const isKeyname: boolean = typeof cin.keyname[key] == "string";
 
-    const getKeynamesFromKeys = function (keys: string): string {
-      return keys
-        .split("")
-        .map((v) => cin.keyname[v])
-        .join("");
-    };
-
     const getCandidatesFromQuick = async function (
       keys: string
-    ): Promise<string[]> {
-      return new Promise<string[]>(function (resolve, reject) {
-        let candidateList: string[] = [];
+    ): Promise<CharDefRecord[]> {
+      return new Promise<CharDefRecord[]>(function (resolve, reject) {
+        let candidateList: CharDefRecord[] = [];
         transaction.objectStore("quick").get(keys).onsuccess = function (
           event: Event
         ) {
@@ -232,7 +232,11 @@ class Cin {
             const candidatesStr = (event.target as IDBRequest).result
               .candidates;
             if (typeof candidatesStr == "string" && candidatesStr.length > 0) {
-              candidateList = candidateList.concat(candidatesStr.split(""));
+              candidateList = candidateList.concat(
+                candidatesStr
+                  .split("")
+                  .map((v) => ({ keycode: keys, candidate: v }))
+              );
             }
           }
           resolve(candidateList);
@@ -241,21 +245,40 @@ class Cin {
     };
 
     const getCandidatesFromChardef = async function (
-      keys: string
-    ): Promise<string[]> {
-      return new Promise<string[]>(function (resolve, reject) {
-        const candidateList: string[] = [];
+      keys: string,
+      partialMatch: boolean = false,
+      maxSize: number = 120
+    ): Promise<CharDefRecord[]> {
+      return new Promise<CharDefRecord[]>(function (resolve, reject) {
+        const range: IDBKeyRange = partialMatch
+          ? IDBKeyRange.lowerBound(keys)
+          : IDBKeyRange.only(keys);
+        const resultList: any[] = [];
         transaction
           .objectStore("chardef")
           .index("keycode")
-          .openCursor(IDBKeyRange.only(keys)).onsuccess = function (
-          event: Event
-        ) {
+          .openCursor(range).onsuccess = function (event: Event) {
           const cursor = (event.target as IDBRequest).result;
-          if (cursor) {
-            candidateList.push(cursor.value.candidate);
+          if (
+            cursor &&
+            resultList.length < maxSize &&
+            cursor.value.keycode.startsWith(keys)
+          ) {
+            const result = cursor.value;
+            result.primaryKey = cursor.primaryKey;
+            resultList.push(result);
             cursor.continue();
           } else {
+            const candidateList: CharDefRecord[] = resultList
+              .filter((v) => v.keycode == keys)
+              .concat(
+                resultList
+                  .filter((v) => v.keycode != keys)
+                  .sort(
+                    (a, b) => parseInt(a.primaryKey) - parseInt(b.primaryKey)
+                  )
+              )
+              .map((v) => ({ keycode: v.keycode, candidate: v.candidate }));
             resolve(candidateList);
           }
         };
@@ -264,29 +287,37 @@ class Cin {
 
     // start push key logic
     const originalKeys: string = cin._keys;
-    const originalCandidateList: string[] = cin.candidateList;
+    const originalCandidateList: CharDefRecord[] = cin.candidateList;
+    const originalPage: number = cin.currentPage;
     switch (cin._status) {
       case Status.INPUT:
-        let quickCandidateList: string[] = [];
-        let chardefCandidateList: string[] = [];
-        cin.candidateList = [];
+        let quickCandidateList: CharDefRecord[] = [];
+        let chardefCandidateList: CharDefRecord[] = [];
+        cin.candidateList = [] as CharDefRecord[];
 
         if (isKeyname) {
           cin._keys += key;
 
           if (
             cin.flagDispFullMatch ||
+            cin.flagDispPartialMatch ||
             isEndKey ||
             (cin.spaceStyle == 2 && cin._keys.length == cin.maxNumOfKeys)
           ) {
             quickCandidateList = await getCandidatesFromQuick(cin._keys);
 
             if (quickCandidateList.length < 1) {
-              chardefCandidateList = await getCandidatesFromChardef(cin._keys);
+              chardefCandidateList = await getCandidatesFromChardef(
+                cin._keys,
+                cin.flagDispPartialMatch && !isEndKey
+              );
             }
           }
-        } else if (isSpace) {
-          chardefCandidateList = await getCandidatesFromChardef(cin._keys);
+        } else if (isSpace && cin._keys.length > 0) {
+          chardefCandidateList = await getCandidatesFromChardef(
+            cin._keys,
+            cin.flagDispPartialMatch && cin.spaceStyle == 1
+          );
         }
 
         if (quickCandidateList.length > 0) {
@@ -299,11 +330,11 @@ class Cin {
           typeof cin.onKeynamesChange == "function" &&
           (!isSelKey || originalCandidateList.length == 0)
         ) {
-          cin.onKeynamesChange(getKeynamesFromKeys(cin._keys));
+          cin.onKeynamesChange(cin.getKeynamesFromKeys(cin._keys));
         }
 
         if (
-          cin.flagDispFullMatch &&
+          (cin.flagDispFullMatch || cin.flagDispPartialMatch) &&
           !(cin.candidateList.length == 0 && originalCandidateList.length == 0)
         ) {
           cin._fireCandidateChange();
@@ -316,11 +347,11 @@ class Cin {
         ) {
           if (cin.candidateList.length > 1) {
             if (isSpace && cin.spaceStyle == 1) {
-              commitText(cin.candidateList[0]);
+              commitText(cin.candidateList[0].candidate);
               return;
             } else {
               cin._status = Status.SELECT;
-              if (!cin.flagDispFullMatch) {
+              if (!cin.flagDispFullMatch && !cin.flagDispPartialMatch) {
                 cin._fireCandidateChange();
               }
               if (typeof cin.onEndKey == "function") {
@@ -329,7 +360,7 @@ class Cin {
               return;
             }
           } else if (cin.candidateList.length == 1) {
-            commitText(cin.candidateList[0]);
+            commitText(cin.candidateList[0].candidate);
             return;
           }
         }
@@ -342,6 +373,7 @@ class Cin {
           cin._keys = originalKeys;
           cin.candidateList = originalCandidateList;
           cin._fireCandidateChange();
+          cin.currentPage = originalPage;
 
           let selectIndex: number = cin.selkey.indexOf(key);
           if (cin.spaceStyle == 1) {
@@ -349,7 +381,7 @@ class Cin {
           }
 
           if (cin.currentCandidateList.length > selectIndex) {
-            commitText(cin.currentCandidateList[selectIndex]);
+            commitText(cin.currentCandidateList[selectIndex].candidate);
           }
           return;
         }
@@ -377,7 +409,7 @@ class Cin {
             selectIndex++;
           }
           if (cin.currentCandidateList.length > selectIndex) {
-            commitText(cin.currentCandidateList[selectIndex]);
+            commitText(cin.currentCandidateList[selectIndex].candidate);
           }
           return;
         } else if (isSpace) {
@@ -386,11 +418,11 @@ class Cin {
             return;
           } else {
             // TODO may be based on space style (e.g. cangjie), no action
-            commitText(cin.currentCandidateList[0]);
+            commitText(cin.currentCandidateList[0].candidate);
             return;
           }
         } else {
-          commitText(cin.currentCandidateList[0]);
+          commitText(cin.currentCandidateList[0].candidate);
           cin.pushKey(key);
           return;
         }
@@ -431,9 +463,9 @@ class Cin {
 
   // Overrided methods
   public onKeynamesChange(keynames: string) {}
-  public onCandidatesChange(candidates: string[]) {}
-  public onCurrentCandidatesChange(candidates: string[]) {}
-  public onEndKey(candidates: string[]) {}
+  public onCandidatesChange(candidates: CharDefRecord[]) {}
+  public onCurrentCandidatesChange(candidates: CharDefRecord[]) {}
+  public onEndKey(candidates: CharDefRecord[]) {}
   public onCommit(text: string) {}
   // End of overrided methods
 }

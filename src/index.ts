@@ -1,5 +1,5 @@
 import "./style.ts";
-import { Cin } from "./cin/cin";
+import { Cin, CharDefRecord } from "./cin/cin";
 import { loadAllFromDB, loadFromStream, deleteFromDB } from "./cin/cinloader";
 import m from "mithril";
 import {
@@ -24,7 +24,7 @@ interface AppState {
   cins: Cin[];
   cinEnable: boolean;
   keynames: string;
-  candidates: string[];
+  candidates: CharDefRecord[];
   needCandidatesSizeChecking: boolean;
   onChangeTextFieldState?: onChangeTextFieldState;
 }
@@ -39,7 +39,7 @@ function initCinEventHandlers(
     m.redraw();
   };
 
-  cin.onCurrentCandidatesChange = function (candidates: string[]) {
+  cin.onCurrentCandidatesChange = function (candidates: CharDefRecord[]) {
     vnode.state.candidates = candidates;
     vnode.state.needCandidatesSizeChecking = true;
     m.redraw();
@@ -76,7 +76,7 @@ const App: m.Component<AppAttrs, AppState> = {
     vnode.state.cins = [] as Cin[];
     vnode.state.cinEnable = true;
     vnode.state.keynames = "";
-    vnode.state.candidates = [];
+    vnode.state.candidates = [] as CharDefRecord[];
     vnode.state.needCandidatesSizeChecking = false;
     loadAllFromDB().then((cins) => {
       vnode.state.cins = cins;

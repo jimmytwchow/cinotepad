@@ -1,4 +1,4 @@
-import { Cin } from "../cin/cin";
+import { Cin, CharDefRecord } from "../cin/cin";
 import m from "mithril";
 import { TextField, onChangeTextFieldState } from "polythene-mithril";
 import { Options as TextFieldOptions } from "polythene-core-textfield";
@@ -6,12 +6,12 @@ import getCaretCoordinates from "textarea-caret";
 import { Candidates, CandidateRecord } from "./candidates";
 
 const ATTR_KEYNAMES_DEFAULT: string = "";
-const ATTR_CANDIDATES_DEFAULT: string[] = [] as string[];
+const ATTR_CANDIDATES_DEFAULT: CharDefRecord[] = [] as CharDefRecord[];
 
 interface CinTextAreaAttrs {
   activeCin?: Cin;
   keynames?: string;
-  candidates?: string[];
+  candidates?: CharDefRecord[];
   needCandidatesSizeChecking?: boolean;
   onChange?(state: onChangeTextFieldState): void;
 }
@@ -21,7 +21,7 @@ interface CinTextAreaState {
   candidatesHeight: number;
   onChangeTextFieldState?: onChangeTextFieldState;
   prevKeynames: string;
-  prevCandidates: string[];
+  prevCandidates: CharDefRecord[];
   prevCurrentPage: number;
   prevTotalPages: number;
   prevCandidatesOffsetH: number;
@@ -73,7 +73,7 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
     vnode.state.candidatesWidth = 0;
     vnode.state.candidatesHeight = 0;
     vnode.state.prevKeynames = "";
-    vnode.state.prevCandidates = [] as string[];
+    vnode.state.prevCandidates = [] as CharDefRecord[];
     vnode.state.prevCurrentPage = 0;
     vnode.state.prevTotalPages = 0;
     vnode.state.prevCandidatesOffsetH = 0;
@@ -186,7 +186,8 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
             values.map((v, i) => ({
               selkey:
                 prependSpace && i == 0 ? " " : selkey[prependSpace ? i - 1 : i],
-              candidate: v,
+              candidate: v.candidate,
+              keynames: cin.getKeynamesFromKeys(v.keycode),
             })))(cin.selkey, displayCandidates, cin.spaceStyle == 1),
           currentPage: displayCurrentPage,
           totalPages: displayTotalPages,
@@ -220,7 +221,8 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
                   prependSpace && i == 0
                     ? " "
                     : selkey[prependSpace ? i - 1 : i],
-                candidate: v,
+                candidate: v.candidate,
+                keynames: cin.getKeynamesFromKeys(v.keycode),
               })))(cin.selkey, candidates, cin.spaceStyle == 1),
             currentPage: currentPage,
             totalPages: totalPages,

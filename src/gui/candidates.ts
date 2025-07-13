@@ -5,7 +5,7 @@ import iconKeyboardArrowDown from "mmsvg/google/msvg/hardware/keyboard-arrow-dow
 import { Button, Card, Icon, SVG } from "polythene-mithril";
 import { ButtonCSS } from "polythene-css";
 
-type CandidateRecord = { selkey: string; candidate: string };
+type CandidateRecord = { selkey: string; candidate: string; keynames: string };
 
 const ATTR_OFFSET_H_DEFAULT: string = "0px";
 const ATTR_OFFSET_V_DEFAULT: string = "0px";
@@ -127,6 +127,16 @@ const Candidates: m.Component<CandidatesAttrs> = {
                             "span.flex.one",
                             { style: { "text-align": "left" } },
                             v.candidate
+                          ),
+                          m(
+                            "span",
+                            {
+                              style: {
+                                "font-size": "x-small",
+                                color: "lightblue",
+                              },
+                            },
+                            v.keynames.replace(vnode.attrs.keynames, "")
                           ),
                         ]
                       )
