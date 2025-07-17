@@ -63,38 +63,39 @@ const CinsDropDown: m.Component<CinsDropDownAttrs, CinsDropDownState> = {
         didHide: (id: string) => (vnode.state.open = false),
         origin: "top",
         width: 3,
-        content: m(List, {
-          tiles: (() => {
-            const resultTiles = (vnode.attrs.cins ?? ATTR_CINS_DEFAULT).map(
-              (cin) =>
-                m(ListTile, {
-                  title: cin.cname,
-                  events: {
-                    onclick: (e: Event) => {
-                      if (vnode.attrs.events?.oncinselected) {
-                        const cse: CinSelectedEvent = { ...e, cin };
-                        vnode.attrs.events?.oncinselected(cse);
-                      }
-                    },
+        content: [
+          m(List, {
+            tiles: (vnode.attrs.cins ?? ATTR_CINS_DEFAULT).map((cin) =>
+              m(ListTile, {
+                title: cin.cname,
+                events: {
+                  onclick: (e: Event) => {
+                    if (vnode.attrs.events?.oncinselected) {
+                      const cse: CinSelectedEvent = { ...e, cin };
+                      vnode.attrs.events?.oncinselected(cse);
+                    }
                   },
-                  secondary: {
-                    content: m(IconButton, {
-                      className: "cinsdropdown-delete-button",
-                      icon: { svg: { content: iconDelete }, size: "small" },
-                      compact: true,
-                      events: {
-                        onclick: (e: Event) => {
-                          if (vnode.attrs.events?.oncindeleted) {
-                            const cde: CinDeletedEvent = { ...e, cin };
-                            vnode.attrs.events?.oncindeleted(cde);
-                          }
-                        },
+                },
+                secondary: {
+                  content: m(IconButton, {
+                    className: "cinsdropdown-delete-button",
+                    icon: { svg: { content: iconDelete }, size: "small" },
+                    compact: true,
+                    events: {
+                      onclick: (e: Event) => {
+                        if (vnode.attrs.events?.oncindeleted) {
+                          const cde: CinDeletedEvent = { ...e, cin };
+                          vnode.attrs.events?.oncindeleted(cde);
+                        }
                       },
-                    }),
-                  },
-                })
-            );
-            resultTiles.push(
+                    },
+                  }),
+                },
+              })
+            ),
+          }),
+          m(List, {
+            tiles: [
               m(FileInput, {
                 title: "匯入CIN檔案…",
                 events: {
@@ -125,9 +126,7 @@ const CinsDropDown: m.Component<CinsDropDownAttrs, CinsDropDownState> = {
                     }
                   },
                 },
-              })
-            );
-            resultTiles.push(
+              }),
               m(URLInput, {
                 title: "從URL匯入…",
                 textFieldLabel: "CIN檔案的URL",
@@ -171,11 +170,10 @@ const CinsDropDown: m.Component<CinsDropDownAttrs, CinsDropDownState> = {
                       );
                   },
                 },
-              })
-            );
-            return resultTiles;
-          })(),
-        }),
+              }),
+            ],
+          }),
+        ],
       }),
       m(Button, {
         id: vnode.state.buttonId,
