@@ -1,3 +1,10 @@
+import {
+  GlobalSettingOption,
+  GLOBAL_SETTING_FLAG_DISP_PARTIAL_MATCH,
+  GLOBAL_SETTING_FLAG_DISP_FULL_MATCH,
+  GLOBAL_SETTING_SPACE_STYLE,
+} from "../globalsetting";
+
 // type definition
 type SpaceStyle = 1 | 2 | 4;
 type Keynames = {
@@ -104,7 +111,12 @@ class Cin {
       return 0;
     } else {
       let listSize = this.dupsel;
-      if (this.spaceStyle == 1) {
+      if (
+        Cin.getSettingValue<SpaceStyle>(
+          GLOBAL_SETTING_SPACE_STYLE,
+          this.spaceStyle
+        ) == 1
+      ) {
         listSize++;
       }
       return Math.ceil(this.candidateList.length / listSize);
@@ -114,7 +126,12 @@ class Cin {
   public get currentCandidateList(): CharDefRecord[] {
     if (this.candidateList.length > 0) {
       let listSize = this.dupsel;
-      if (this.spaceStyle == 1) {
+      if (
+        Cin.getSettingValue<SpaceStyle>(
+          GLOBAL_SETTING_SPACE_STYLE,
+          this.spaceStyle
+        ) == 1
+      ) {
         listSize++;
       }
       return this.candidateList.slice(
@@ -144,6 +161,39 @@ class Cin {
   // End of private used method
 
   // Public methods implementation
+  public static getFlagValue(globalSettingKey: string, flag: boolean): boolean {
+    let returnValue: boolean;
+    switch (
+      parseInt(localStorage.getItem(globalSettingKey)) as GlobalSettingOption
+    ) {
+      case GlobalSettingOption.YES:
+        returnValue = true;
+        break;
+      case GlobalSettingOption.NO:
+        returnValue = false;
+        break;
+      default:
+        returnValue = flag;
+    }
+    return returnValue;
+  }
+
+  public static getSettingValue<T extends number | string = string>(
+    globalSettingKey: string,
+    setting: T
+  ): T {
+    const globalSetting: string = localStorage.getItem(globalSettingKey);
+    if (globalSetting == String(GlobalSettingOption.FOLLOW_CIN_FILE)) {
+      return setting;
+    } else {
+      if (typeof setting == "number") {
+        return parseInt(globalSetting) as T;
+      } else {
+        return globalSetting as T;
+      }
+    }
+  }
+
   public getKeynamesFromKeys(keys: string): string {
     return keys
       .split("")
@@ -219,6 +269,18 @@ class Cin {
     const isEndKey: boolean = cin.endkey.indexOf(key) > -1;
     const isSelKey: boolean = cin.selkey.indexOf(key) > -1;
     const isKeyname: boolean = typeof cin.keyname[key] == "string";
+    const flagDispFullMatch: boolean = Cin.getFlagValue(
+      GLOBAL_SETTING_FLAG_DISP_FULL_MATCH,
+      cin.flagDispFullMatch
+    );
+    const flagDispPartialMatch: boolean = Cin.getFlagValue(
+      GLOBAL_SETTING_FLAG_DISP_PARTIAL_MATCH,
+      cin.flagDispPartialMatch
+    );
+    const spaceStyle: SpaceStyle = Cin.getSettingValue(
+      GLOBAL_SETTING_SPACE_STYLE,
+      cin.spaceStyle
+    );
 
     const getCandidatesFromQuick = async function (
       keys: string
@@ -299,24 +361,24 @@ class Cin {
           cin._keys += key;
 
           if (
-            cin.flagDispFullMatch ||
-            cin.flagDispPartialMatch ||
+            flagDispFullMatch ||
+            flagDispPartialMatch ||
             isEndKey ||
-            (cin.spaceStyle == 2 && cin._keys.length == cin.maxNumOfKeys)
+            (spaceStyle == 2 && cin._keys.length == cin.maxNumOfKeys)
           ) {
             quickCandidateList = await getCandidatesFromQuick(cin._keys);
 
             if (quickCandidateList.length < 1) {
               chardefCandidateList = await getCandidatesFromChardef(
                 cin._keys,
-                cin.flagDispPartialMatch && !isEndKey
+                flagDispPartialMatch && !isEndKey
               );
             }
           }
         } else if (isSpace && cin._keys.length > 0) {
           chardefCandidateList = await getCandidatesFromChardef(
             cin._keys,
-            cin.flagDispPartialMatch && cin.spaceStyle == 1
+            flagDispPartialMatch && spaceStyle == 1
           );
         }
 
@@ -334,7 +396,7 @@ class Cin {
         }
 
         if (
-          (cin.flagDispFullMatch || cin.flagDispPartialMatch) &&
+          (flagDispFullMatch || flagDispPartialMatch) &&
           !(cin.candidateList.length == 0 && originalCandidateList.length == 0)
         ) {
           cin._fireCandidateChange();
@@ -343,15 +405,15 @@ class Cin {
         if (
           isEndKey ||
           isSpace ||
-          (cin.spaceStyle == 2 && cin._keys.length == cin.maxNumOfKeys)
+          (spaceStyle == 2 && cin._keys.length == cin.maxNumOfKeys)
         ) {
           if (cin.candidateList.length > 1) {
-            if (isSpace && cin.spaceStyle == 1) {
+            if (isSpace && spaceStyle == 1) {
               commitText(cin.candidateList[0].candidate);
               return;
             } else {
               cin._status = Status.SELECT;
-              if (!cin.flagDispFullMatch && !cin.flagDispPartialMatch) {
+              if (!flagDispFullMatch && !flagDispPartialMatch) {
                 cin._fireCandidateChange();
               }
               if (typeof cin.onEndKey == "function") {
@@ -376,7 +438,7 @@ class Cin {
           cin.currentPage = originalPage;
 
           let selectIndex: number = cin.selkey.indexOf(key);
-          if (cin.spaceStyle == 1) {
+          if (spaceStyle == 1) {
             selectIndex++;
           }
 
@@ -405,7 +467,7 @@ class Cin {
       case Status.SELECT:
         if (isSelKey) {
           let selectIndex: number = cin.selkey.indexOf(key);
-          if (cin.spaceStyle == 1) {
+          if (spaceStyle == 1) {
             selectIndex++;
           }
           if (cin.currentCandidateList.length > selectIndex) {

@@ -1,9 +1,13 @@
-import { Cin, CharDefRecord } from "../cin/cin";
+import { Cin, CharDefRecord, SpaceStyle } from "../cin/cin";
 import m from "mithril";
 import { TextField, onChangeTextFieldState } from "polythene-mithril";
 import { Options as TextFieldOptions } from "polythene-core-textfield";
 import getCaretCoordinates from "textarea-caret";
 import { Candidates, CandidateRecord } from "./candidates";
+import {
+  GLOBAL_SETTING_FLAG_VERTICAL_SELECTION,
+  GLOBAL_SETTING_SPACE_STYLE,
+} from "../globalsetting";
 
 const ATTR_KEYNAMES_DEFAULT: string = "";
 const ATTR_CANDIDATES_DEFAULT: CharDefRecord[] = [] as CharDefRecord[];
@@ -179,7 +183,10 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
           offsetH: String(displayOffsetH) + "px",
           offsetV: String(displayOffsetV) + "px",
           show: displayCandidates.length > 0 || displayKeynames.length > 0,
-          verticalSelection: cin.flagVerticalSelection,
+          verticalSelection: Cin.getFlagValue(
+            GLOBAL_SETTING_FLAG_VERTICAL_SELECTION,
+            cin.flagVerticalSelection
+          ),
           imeName: cin.cname,
           keynames: displayKeynames,
           candidates: ((selkey, values, prependSpace): CandidateRecord[] =>
@@ -188,7 +195,14 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
                 prependSpace && i == 0 ? " " : selkey[prependSpace ? i - 1 : i],
               candidate: v.candidate,
               keynames: cin.getKeynamesFromKeys(v.keycode),
-            })))(cin.selkey, displayCandidates, cin.spaceStyle == 1),
+            })))(
+            cin.selkey,
+            displayCandidates,
+            Cin.getSettingValue<SpaceStyle>(
+              GLOBAL_SETTING_SPACE_STYLE,
+              cin.spaceStyle
+            ) == 1
+          ),
           currentPage: displayCurrentPage,
           totalPages: displayTotalPages,
           events: {
@@ -212,7 +226,10 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
             offsetH: "0px",
             offsetV: "0px",
             show: candidates.length > 0 || keynames.length > 0,
-            verticalSelection: cin.flagVerticalSelection,
+            verticalSelection: Cin.getFlagValue(
+              GLOBAL_SETTING_FLAG_VERTICAL_SELECTION,
+              cin.flagVerticalSelection
+            ),
             imeName: cin.cname,
             keynames: keynames,
             candidates: ((selkey, values, prependSpace): CandidateRecord[] =>
@@ -223,7 +240,14 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
                     : selkey[prependSpace ? i - 1 : i],
                 candidate: v.candidate,
                 keynames: cin.getKeynamesFromKeys(v.keycode),
-              })))(cin.selkey, candidates, cin.spaceStyle == 1),
+              })))(
+              cin.selkey,
+              candidates,
+              Cin.getSettingValue<SpaceStyle>(
+                GLOBAL_SETTING_SPACE_STYLE,
+                cin.spaceStyle
+              ) == 1
+            ),
             currentPage: currentPage,
             totalPages: totalPages,
           })
