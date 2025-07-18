@@ -39,3 +39,10 @@ declare module "mmsvg/google/msvg/navigation/arrow-back" {
   export = ArrowBack;
   declare const ArrowBack: m.Vnode<any, any>;
 }
+
+declare module "mmsvg/templarian/msvg/github" {
+  import * as m from "mithril";
+
+  export = GitHub;
+  declare const GitHub: m.Vnode<any, any>;
+}

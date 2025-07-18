@@ -1,6 +1,7 @@
 import { Cin, CharDefRecord, SpaceStyle } from "../cin/cin";
 import m from "mithril";
 import { TextField, onChangeTextFieldState } from "polythene-mithril";
+import { TextFieldCSS } from "polythene-css";
 import { Options as TextFieldOptions } from "polythene-core-textfield";
 import getCaretCoordinates from "textarea-caret";
 import { Candidates, CandidateRecord } from "./candidates";
@@ -72,6 +73,11 @@ function getCandidatesListOffsets(
   return { offsetH, offsetV };
 }
 
+TextFieldCSS.addStyle(".cinotepad-textfield", {
+  full_width_input_padding_h: 7,
+  full_width_input_padding_v: 0,
+});
+
 const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
   oninit(vnode) {
     vnode.state.candidatesWidth = 0;
@@ -110,10 +116,10 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
 
     // construct the result Vnode
     let textFieldAttrs: TextFieldOptions = {
-      id: "ta_cinotepad",
+      className: "cinotepad-textfield",
       label: "請輸入…",
       multiLine: true,
-      rows: 20,
+      fullWidth: true,
       onChange: (state: onChangeTextFieldState) => {
         vnode.state.onChangeTextFieldState = state;
         if (vnode.attrs.onChange) {
@@ -262,7 +268,7 @@ const CinTextArea: m.Component<CinTextAreaAttrs, CinTextAreaState> = {
       vnode.state.prevCandidatesOffsetV = offsetV;
     }
 
-    return m("div", { style: { position: "relative" } }, childElements);
+    return m(".cinotepad-cintextarea.flex.one", childElements);
   },
 };
 

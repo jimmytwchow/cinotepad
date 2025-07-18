@@ -3,6 +3,7 @@ import { Cin, CharDefRecord } from "../cin/cin";
 import { loadFromStream, deleteFromDB } from "../cin/cinloader";
 import m from "mithril";
 import iconSettings from "mmsvg/google/msvg/action/settings";
+import iconGitHub from "mmsvg/templarian/msvg/github";
 import {
   Toolbar,
   ToolbarTitle,
@@ -78,102 +79,131 @@ const App: m.Component<AppAttrs, AppState> = {
     let needCandidatesSizeChecking = vnode.state.needCandidatesSizeChecking;
     vnode.state.needCandidatesSizeChecking = false;
     return [
-      m(Toolbar, { border: true }, [
-        m(ToolbarTitle, { text: "CINotepad" }),
-        m(CinsDropDown, {
-          activeCin: vnode.attrs.state.activeCin,
-          cins: vnode.attrs.state.cins,
-          events: {
-            oncinselected: (e) => {
-              vnode.attrs.state.activeCin = e.cin;
-              vnode.attrs.state.activeCin.enable = vnode.attrs.state.cinEnable;
-              focusTextField(vnode);
-            },
-            oncindeleted: (e) => {
-              deleteFromDB(e.cin).catch((err: Error) => {
-                showMessageDialog(err.message);
-                console.error(err);
-              });
-              vnode.attrs.state.cins.splice(
-                vnode.attrs.state.cins.indexOf(e.cin),
-                1
-              );
-              if (vnode.attrs.state.activeCin == e.cin) {
-                delete vnode.attrs.state.activeCin;
-              }
-              focusTextField(vnode);
-            },
-            oncinimported: (e) => {
-              loadFromStream(e.cinID, e.stream)
-                .then((cin) => {
-                  Dialog.hide();
-
-                  vnode.attrs.state.activeCin = cin;
-                  vnode.attrs.state.cins.push(cin);
-
-                  initCinEventHandlers(cin, vnode);
-
-                  cin.enable = vnode.attrs.state.cinEnable;
-
-                  focusTextField(vnode);
-
-                  m.redraw();
-                })
-                .catch((err: Error) => {
-                  Dialog.hide().then(() => {
-                    showMessageDialog(err.message);
-                    console.error(err);
-                  });
+      m(".cinotepad-app.layout.vertical", [
+        m(Toolbar, { className: "flex.auto", border: true }, [
+          m(ToolbarTitle, { text: "CINotepad" }),
+          m(CinsDropDown, {
+            activeCin: vnode.attrs.state.activeCin,
+            cins: vnode.attrs.state.cins,
+            events: {
+              oncinselected: (e) => {
+                vnode.attrs.state.activeCin = e.cin;
+                vnode.attrs.state.activeCin.enable =
+                  vnode.attrs.state.cinEnable;
+                focusTextField(vnode);
+              },
+              oncindeleted: (e) => {
+                deleteFromDB(e.cin).catch((err: Error) => {
+                  showMessageDialog(err.message);
+                  console.error(err);
                 });
+                vnode.attrs.state.cins.splice(
+                  vnode.attrs.state.cins.indexOf(e.cin),
+                  1
+                );
+                if (vnode.attrs.state.activeCin == e.cin) {
+                  delete vnode.attrs.state.activeCin;
+                }
+                focusTextField(vnode);
+              },
+              oncinimported: (e) => {
+                loadFromStream(e.cinID, e.stream)
+                  .then((cin) => {
+                    Dialog.hide();
+
+                    vnode.attrs.state.activeCin = cin;
+                    vnode.attrs.state.cins.push(cin);
+
+                    initCinEventHandlers(cin, vnode);
+
+                    cin.enable = vnode.attrs.state.cinEnable;
+
+                    focusTextField(vnode);
+
+                    m.redraw();
+                  })
+                  .catch((err: Error) => {
+                    Dialog.hide().then(() => {
+                      showMessageDialog(err.message);
+                      console.error(err);
+                    });
+                  });
+              },
             },
-          },
-        }),
-        m(Button, {
-          label: vnode.attrs.state.cinEnable ? "中" : "英",
-          events: {
-            onclick: (e: Event) => {
-              vnode.attrs.state.cinEnable = !vnode.attrs.state.cinEnable;
-              if (vnode.attrs.state.activeCin) {
-                const cin = vnode.attrs.state.activeCin as Cin;
-                cin.enable = vnode.attrs.state.cinEnable;
-              }
-              focusTextField(vnode);
+          }),
+          m(Button, {
+            label: vnode.attrs.state.cinEnable ? "中" : "英",
+            events: {
+              onclick: (e: Event) => {
+                vnode.attrs.state.cinEnable = !vnode.attrs.state.cinEnable;
+                if (vnode.attrs.state.activeCin) {
+                  const cin = vnode.attrs.state.activeCin as Cin;
+                  cin.enable = vnode.attrs.state.cinEnable;
+                }
+                focusTextField(vnode);
+              },
             },
+          }),
+          m(IconButton, {
+            icon: {
+              svg: { content: iconSettings },
+            },
+            element: m.route.Link,
+            url: { href: "/setting" },
+          }),
+        ]),
+        m(CinTextArea, {
+          activeCin: vnode.attrs.state.activeCin,
+          keynames: vnode.attrs.state.keynames,
+          candidates: vnode.attrs.state.candidates,
+          needCandidatesSizeChecking,
+          onChange: (state: onChangeTextFieldState) => {
+            if (!vnode.state.onChangeTextFieldState) {
+              const { setInputState, el: element } = state;
+              const el = element as HTMLTextAreaElement;
+              setInputState({
+                focus: true,
+                value: vnode.attrs.state.textContent,
+              });
+              el.setSelectionRange(
+                vnode.attrs.state.selectionPos,
+                vnode.attrs.state.selectionPos
+              );
+              el.onselectionchange = () => {
+                vnode.attrs.state.selectionPos = el.selectionStart;
+              };
+            }
+            vnode.state.onChangeTextFieldState = state;
+            vnode.attrs.state.textContent = state.value;
           },
         }),
-        m(IconButton, {
-          icon: {
-            svg: { content: iconSettings },
-          },
-          element: m.route.Link,
-          url: { href: "/setting" },
-        }),
+        m(".cinotepad-footer.flex.none.layout", [
+          m(".flex.one.self-center", [
+            "© 2025 jimmytwchow. CINotepad is licensed under ",
+            m(
+              "a",
+              {
+                href: "https://github.com/jimmytwchow/cinotepad/blob/main/LICENSE",
+                target: "_blank",
+              },
+              "MIT License"
+            ),
+            ".",
+          ]),
+          m(".flex.none.self-center", "Repository: "),
+          m(IconButton, {
+            icon: {
+              svg: { content: iconGitHub },
+              size: "small",
+            },
+            compact: true,
+            element: "a[target='_blank']",
+            url: {
+              href: "https://github.com/jimmytwchow/cinotepad",
+            },
+          }),
+        ]),
       ]),
-      m(CinTextArea, {
-        activeCin: vnode.attrs.state.activeCin,
-        keynames: vnode.attrs.state.keynames,
-        candidates: vnode.attrs.state.candidates,
-        needCandidatesSizeChecking,
-        onChange: (state: onChangeTextFieldState) => {
-          if (!vnode.state.onChangeTextFieldState) {
-            const { setInputState, el: element } = state;
-            const el = element as HTMLTextAreaElement;
-            setInputState({
-              focus: true,
-              value: vnode.attrs.state.textContent,
-            });
-            el.setSelectionRange(
-              vnode.attrs.state.selectionPos,
-              vnode.attrs.state.selectionPos
-            );
-            el.onselectionchange = () => {
-              vnode.attrs.state.selectionPos = el.selectionStart;
-            };
-          }
-          vnode.state.onChangeTextFieldState = state;
-          vnode.attrs.state.textContent = state.value;
-        },
-      }),
       m(Dialog),
     ];
   },
