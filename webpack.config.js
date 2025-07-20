@@ -1,5 +1,6 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const WebpackFavicons = require("webpack-favicons");
 const WorkboxPlugin = require("workbox-webpack-plugin");
 
 module.exports = {
@@ -20,6 +21,20 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({ title: "CINotepad" }),
+    new WebpackFavicons({
+      src: "src/favicon.svg",
+      appName: "CINotepad",
+      background: "#ff007f",
+      theme_color: "#ff007f",
+      display: "standalone",
+      icons: {
+        android: { offset: 15, background: true },
+        appleIcon: { offset: 15, background: true },
+        appleStartup: { offset: 15, background: true },
+        favicons: true,
+        windows: { offset: 15, background: true },
+      },
+    }),
     new WorkboxPlugin.GenerateSW({
       clientsClaim: true,
       skipWaiting: true,
