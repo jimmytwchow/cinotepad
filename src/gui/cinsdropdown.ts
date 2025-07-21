@@ -177,6 +177,7 @@ const CinsDropDown: m.Component<CinsDropDownAttrs, CinsDropDownState> = {
       }),
       m(Button, {
         id: vnode.state.buttonId,
+        className: "cinotepad-toolbar-button",
         label: vnode.attrs.activeCin?.cname ?? "請選擇輸入法…",
         dropdown: { open: vnode.state.open },
         events: {

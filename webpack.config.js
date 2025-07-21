@@ -18,6 +18,9 @@ module.exports = {
   },
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
+    alias: {
+      "polythene-theme": path.resolve(__dirname, "src/custom-theme.ts"),
+    },
   },
   plugins: [
     new HtmlWebpackPlugin({ title: "CINotepad" }),

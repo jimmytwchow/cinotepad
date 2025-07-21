@@ -80,7 +80,7 @@ const App: m.Component<AppAttrs, AppState> = {
     vnode.state.needCandidatesSizeChecking = false;
     return [
       m(".cinotepad-app.layout.vertical", [
-        m(Toolbar, { className: "flex.auto", border: true }, [
+        m(Toolbar, { className: "cinotepad-toolbar", border: true }, [
           m(ToolbarTitle, { text: "CINotepad" }),
           m(CinsDropDown, {
             activeCin: vnode.attrs.state.activeCin,
@@ -132,6 +132,7 @@ const App: m.Component<AppAttrs, AppState> = {
             },
           }),
           m(Button, {
+            className: "cinotepad-toolbar-button",
             label: vnode.attrs.state.cinEnable ? "中" : "英",
             events: {
               onclick: (e: Event) => {
@@ -145,6 +146,7 @@ const App: m.Component<AppAttrs, AppState> = {
             },
           }),
           m(IconButton, {
+            className: "cinotepad-toolbar-icon-button",
             icon: {
               svg: { content: iconSettings },
             },
@@ -192,6 +194,7 @@ const App: m.Component<AppAttrs, AppState> = {
           ]),
           m(".flex.none.self-center", "Repository: "),
           m(IconButton, {
+            className: "cinotepad-toolbar-icon-button",
             icon: {
               svg: { content: iconGitHub },
               size: "small",

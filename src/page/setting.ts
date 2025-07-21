@@ -76,8 +76,9 @@ const GlobalSettingSpaceStyleList: m.Component<GlobalSettingSpaceStyleListAttrs>
 const Setting: m.Component = {
   view(vnode) {
     return [
-      m(Toolbar, { border: true }, [
+      m(Toolbar, { className: "cinotepad-toolbar", border: true }, [
         m(IconButton, {
+          className: "cinotepad-toolbar-icon-button",
           icon: {
             svg: { content: iconArrowBack },
           },
