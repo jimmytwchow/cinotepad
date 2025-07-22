@@ -30,6 +30,8 @@ module.exports = {
       background: "#ff007f",
       theme_color: "#ff007f",
       display: "standalone",
+      scope: "/cinotepad/",
+      start_url: "/cinotepad",
       icons: {
         android: { offset: 15, background: true },
         appleIcon: { offset: 15, background: true },

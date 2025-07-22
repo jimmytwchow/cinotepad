@@ -6,8 +6,8 @@
   "lang": "en-US",
   "display": "standalone",
   "orientation": "any",
-  "scope": "",
-  "start_url": "/?homescreen=1",
+  "scope": "/cinotepad/",
+  "start_url": "/cinotepad",
   "background_color": "#ff007f",
   "theme_color": "#ff007f",
   "icons": [
